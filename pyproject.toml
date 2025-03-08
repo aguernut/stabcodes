@@ -5,3 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "stabcodes"
 version = "0.1"
+dependencies = [
+"networkx",
+"numpy",
+"stim >= 1.12",
+"sinter >= 1.12"
+]
+
+[docs]
+dependencies = [
+"sphinx",
+]
