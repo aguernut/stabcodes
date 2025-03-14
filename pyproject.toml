@@ -8,8 +8,10 @@ version = "0.1"
 dependencies = [
 "networkx",
 "numpy",
+"typing_extensions",
 "stim >= 1.12",
-"sinter >= 1.12"
+"sinter >= 1.12",
+"qiskit"
 ]
 
 [docs]

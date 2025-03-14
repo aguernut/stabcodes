@@ -1,10 +1,10 @@
-{{ fullname | escape | underline}}
+{{ objname | escape | underline}}
 
 .. automodule:: {{ fullname }}
-  
+
    {% block attributes %}
    {% if attributes %}
-   .. rubric:: Module Attributes
+   .. rubric:: {{ _('Attributes') }}
 
    .. autosummary::
       :toctree:
@@ -20,6 +20,7 @@
 
    .. autosummary::
       :toctree:
+      :template: custom-function-template.rst 
    {% for item in functions %}
       {{ item }}
    {%- endfor %}
@@ -32,7 +33,7 @@
 
    .. autosummary::
       :toctree:
-      :template: custom-class-template.rst
+      :template: custom-class-template.rst 
    {% for item in classes %}
       {{ item }}
    {%- endfor %}
@@ -57,8 +58,7 @@
 
 .. autosummary::
    :toctree:
-   :template: custom-module-template.rst
-   :recursive:
+   :template: custom-module-template.rst 
 {% for item in modules %}
    {{ item }}
 {%- endfor %}

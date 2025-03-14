@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 Stabcodes' documentation
-==========================
+========================
 
 **Stabcodes** is a Python library that comes as a wrapper around **stim** and offers high-level functions and classes to simulate Quantum Error Correction circuit experiments.
 
@@ -13,13 +13,14 @@ Stabcodes' documentation
    This library was developed during my thesis to simplify my stim experiment. It is *not* in active development. Check out the :doc:`usage` section to :ref:`install <installation>` it.
 
 .. toctree::
-   usage
    :maxdepth: 2
    :caption: Contents:
 
+   usage
+
 .. autosummary::
-   :toctree: _autosummary
-   :template: custom-module-template.rst
+   :toctree: _toctree
    :recursive:
+   :template: custom-module-template.rst
 
    stabcodes
