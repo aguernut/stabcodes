@@ -14,7 +14,8 @@ dependencies = [
 "qiskit"
 ]
 
-[docs]
-dependencies = [
+[project.optional-dependencies]
+doc = [
 "sphinx",
+"pydata_sphinx_theme",
 ]

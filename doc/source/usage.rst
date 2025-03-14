@@ -11,3 +11,8 @@ There is no Pypi package associated to this library, so you will have to clone t
 .. code-block:: console
 
 	(venv) $ pip install -e stabcodes
+
+
+.. code-block:: console
+
+        (venv) $ pip install -e stabcode[doc]
