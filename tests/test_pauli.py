@@ -1,5 +1,5 @@
 import unittest
-from ..Pauli import *
+from stabcodes.pauli import Pauli
 
 
 class TestPauliMethods(unittest.Test):
