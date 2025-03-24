@@ -5,6 +5,7 @@
 
 from typing import Optional, Union
 from itertools import chain
+from copy import copy
 from collections.abc import MutableMapping, Mapping, Sequence, MutableSequence, Hashable
 
 
@@ -360,9 +361,29 @@ class RecursiveMapping(MutableMapping, MutableSequence):
         return iter(v for (_, v) in self.items())
 
     def __copy__(self):
-        
+        if len(self._type) == 0:
+            return type(self)()
+
+        if len(self._type) == 1:
+            return type(self)(list(self))
+
+        return type(self)({copy(k): copy(v) for k, v in self._container.items()})
 
     def copy(self):
+        """
+        Deepcopy of this object.
+
+        Examples
+        --------
+        >>> d = RecursiveMapping({"a": [1, 2], "z": range(3), "Z": [3]})
+        >>> e = d.copy()
+        >>> e[3] = 4
+        >>> d
+        RecursiveMapping({'Z': RecursiveMapping([3]), 'a': RecursiveMapping([1, 2]), 'z': RecursiveMapping([0, 1, 2])})
+        >>> e
+        RecursiveMapping({'Z': RecursiveMapping([3]), 'a': RecursiveMapping([1, 2]), 'z': RecursiveMapping([4, 1, 2])})
+
+        """
         return self.__copy__()
 
     def items(self):
