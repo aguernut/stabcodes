@@ -847,17 +847,6 @@ class RecursiveMapping(MutableMapping, MutableSequence):
     reverse = None
 
 
-class StabGen(RecursiveMapping):
-
-    def __init__(self, value: Optional[Union[Sequence, Mapping]] = None):
-        super().__init__(value)
-
-    def apply_circuit_to_stabs(self, circuit, stabs):
-        for stab in self:
-            stabs.apply_circuit(circuit)
-
-
-
 if __name__ == "__main__":
     import doctest
     doctest.testmod(optionflags=doctest.ELLIPSIS)
