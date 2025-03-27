@@ -24,13 +24,20 @@ class StabilizerCode:
         self._stabilizers = StabGen(stabilizers)
         self._qubits = qubits
         self._logical_operators = StabGen(logical_operators)
-        self._measure_count = count()
         self._stab_relations = [] if stab_relations is None else stab_relations
 
         self.check()
 
-    def shift_qubits(self, n, extend_to):
-        raise NotImplementedError
+    def shift_qubits(self, n: int, extend_to=None):
+        self._qubits = range(self._qubits.start + n, self._qubits.stop + n)
+        if extend_to is None:
+            extend_to = self._qubits.stop
+        m = extend_to - self._qubits.stop
+
+        self._stabilizers.extend(m)
+        self._stabilizers.itranslate(n=n)
+        self._logical_operators.extend(m)
+        self._logical_operators.itranslate(n=n)
 
     def copy(self):
         return type(self)(copy(self._stabilizers), copy(self._logical_operators),
@@ -43,6 +50,10 @@ class StabilizerCode:
     @property
     def num_qubits(self):
         return len(self._qubits)
+
+    @property
+    def qubits(self):
+        return range(self._qubits.start, self._qubits.stop)
 
     @property
     def num_logical_qubits(self):
@@ -229,7 +240,7 @@ class SurfaceCode(StabilizerCode):
 
         for stab in code.iter_stabilizers():
             for i in (dx * dz + i * dx for i in range(dz)):
-                stab._PauliOperator__paulis[i] = I(i)
+                stab[i] = I(i)
             foo = stab.support_as_set
             stab.order = [i for i in stab.order if i in foo]
 
@@ -518,38 +529,6 @@ def S_trans():
 
 # def last_exp():
 #      raise NotImplementedError
-
-
-class StimExperiment:
-
-    def __init__(self):
-        self._circuit = ""
-        self._variables = {}
-        self.count = count()
-
-    def startup(self, *codes):
-        raise NotImplementedError
-
-    def measure(self):
-        raise NotImplementedError
-
-    def stim_measure_changing_support_text(self):
-        raise NotImplementedError
-
-    def stim_logical_measure(self):
-        raise NotImplementedError
-
-    def stim_realistic_logical_measure_text(self):
-        raise NotImplementedError
-
-    def stim_realistic_Bell_logical_measure_text(self):
-        raise NotImplementedError
-
-    def stim_depolarize1(self):
-        raise NotImplementedError
-
-    def stim_x_error_text(self):
-        raise NotImplementedError
 
 
 def test_dehn_twist1():

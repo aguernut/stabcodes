@@ -982,6 +982,8 @@ class PauliOperator:
         self.__paulis += [Pauli("I", i)
                           for i in range(self.nb_qubits, self.nb_qubits + n)]
         self.__nb_qubits += n
+        self.__support = None
+        self.__support_as_set = None
 
     def __mul__(self, other: "PauliOperator") -> "PauliOperator":
         """Special function for the multiplication of Pauli operators.
@@ -1074,6 +1076,14 @@ class PauliOperator:
 
     def _simplification_potential(self, other: "PauliOperator") -> int:
         return sum(_COST[p.kind + q.kind] for p, q in zip(self.paulis, other.paulis))
+
+    def __getitem__(self, index):
+        return self.__paulis[index]
+
+    def __setitem__(self, index, pauli):
+        self.__paulis[index] = pauli
+        self.__support = None
+        self.__support_as_set = None
 
     @property
     def support(self) -> list[int]:

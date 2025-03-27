@@ -50,6 +50,10 @@ class StabGen(RecursiveMapping):
 
         return (self.to_matrix() @ lambd @ other.to_matrix().T) % 2
 
+    def reset(self):
+        for s in self:
+            s.reset()
+
     def extend(self, n: int):
         for s in self:
             s.extend(n)
