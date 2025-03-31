@@ -3,7 +3,7 @@
 """
 
 from stabcodes.pauli import PauliOperator
-from itertools import count
+from itertools import count, product
 
 
 class MeasureClock:
@@ -49,7 +49,7 @@ class StimExperiment:
 
         self._measure_clock = MeasureClock()
         self._physical_measurement = {}
-        self.codes = list(codes)
+        self._codes = list(codes)
         N = sum(c.num_qubits for c in codes)
         self._data_qubits = range(N)
         qb_shift = 0
@@ -69,12 +69,11 @@ class StimExperiment:
     def measure_refined_phenom(self, *codes, meas_noise=0.0, project=None, detector_decoration=None):
         if not codes:
             codes = self._codes
-            if detector_decoration is None:
-                detector_decoration = "0"
+
         for code in codes:
             for s in code._stabilizers:
                 s.measure(self._measure_clock)
-                self._circuit += "MPP({meas_noise}) " + "*".join(f"{s[i].kind + str(s[i].qubit)}" for i in s.support) + "\n"
+                self._circuit += f"MPP({meas_noise}) " + "*".join(f"{s[i].kind + str(s[i].qubit)}" for i in s.support) + "\n"
                 if project is None:
                     self._circuit += "DETECTOR" + (f"({detector_decoration}) " if detector_decoration else " ") + f"rec[-1] rec[{s.last_measure_time[-2] - s.last_measure_time[-1] - 1}]\n"
                 elif project == "Z" and s.isZ or project == "X" and s.isX:
@@ -94,6 +93,20 @@ class StimExperiment:
         self._circuit += f"M{basis} " + " ".join(str(i) for i in to_measure) + "\n"
         for i in to_measure:
             self._physical_measurement[i] = (basis, next(self._measure_clock))
+
+    def reconstruct_stabilizers(self, *codes, detector_decoration=None):
+        current = self._measure_clock.current
+        if not codes:
+            codes = self._codes
+
+        for c in codes:
+            for s in c.stabilizers:
+                for qb in s.support:
+                    (basis, meas_time) = self._physical_measurement.get(qb, (None, None))
+                    if basis is None or basis != s[qb].kind:
+                        break
+                else:
+                    self._circuit += "DETECTOR" + (f"({detector_decoration}) " if detector_decoration else " ") + " ".join(f"rec[{self._physical_measurement[qb][1] - current - 1}]" for qb in s.support) + f" rec[{s.last_measure_time[-1] - current - 1}]\n"
 
     def reconstruct_observable(self, index, operator):
         current = self._measure_clock.current
@@ -124,32 +137,72 @@ class StimExperiment:
     def stim_x_error_text(self):
         raise NotImplementedError
 
+    def get_task(self, **values):
+        ordered_keys = values.keys()
+        assert set(var._name for var in self._variables.keys()) <= set(ordered_keys), f"All declared variables must be assigned, {set(self._variables.keys()) - set(ordered_keys)} not set"
+
+        tasks = []
+        for vals in product(*values.values()):
+            metadata = dict(zip(ordered_keys, vals))
+            tasks.append(sinter.Task(circuit=stim.Circuit(self._circuit.format(**metadata)),
+                                     json_metadata=metadata))
+
+        return tasks
+
 
 if __name__ == "__main__":
     from stabcodes.stabilizer_code import SurfaceCode
     import stim
+    import sinter
+    import uuid
+    from stabcodes.visualization import dump_to_csv, plot_error_rate
+    from datetime import date
 
-    c = SurfaceCode.toric_code(3, 3)
-    exp = StimExperiment()
-    meas_noise = Variable("meas_noise")
-    pauli_noise = Variable("pauli_noise")
-    exp.add_variables(meas_noise)
-    exp.add_variables(pauli_noise)
-    exp.startup(c, init_bases="Z")
-    exp.measure_refined_phenom(c, meas_noise=meas_noise, project="Z")
+    def SurfaceMemory(distance):
+        code = SurfaceCode.toric_code(distance, distance)
+        exp = StimExperiment()
+        noise = Variable("noise")
+        exp.add_variables(noise)
+        exp.startup(code, init_bases="Z")
+        exp.measure_refined_phenom(code, meas_noise=noise, project="Z")
 
-    for i, log in enumerate(c.logical_operators["Z"]):
-        exp.observable_measurement(i, log, meas_noise)
+        for i, log in enumerate(code.logical_operators["Z"]):
+            exp.observable_measurement(i, log, 0.0)
 
-    for _ in range(3):
-        exp.measure_refined_phenom(c, meas_noise=meas_noise)
-        exp.depolarize1(pauli_noise)
+        for _ in range(distance):
+            exp.measure_refined_phenom(code, meas_noise=noise)
+            exp.depolarize1(noise)
 
-    exp.destructive_measurement("Z")
-    for i, log in enumerate(c.logical_operators["Z"]):
-        exp.reconstruct_observable(i, log)
+        exp.destructive_measurement("Z")
+        exp.reconstruct_stabilizers()
+        for i, log in enumerate(code.logical_operators["Z"]):
+            exp.reconstruct_observable(i, log)
 
-    with open("exp.circ", "w") as f:
-        f.write(exp._circuit)
+        return exp
 
-    print(stim.Circuit(exp._circuit.format(meas_noise=0.01, pauli_noise=0.1)))
+    tasks = []
+
+    for distance in range(3, 12, 2):
+        exp = SurfaceMemory(distance)
+        tasks.extend(exp.get_task(d=[distance],
+                                  noise=[0.035 * ((0.045/0.035)**(i / 20)) for i in range(21)]))
+
+        with open("debug", "w") as f:
+            circ = exp._circuit.format(noise=0.02)
+            f.write(circ)
+            mini = stim.Circuit(circ).shortest_graphlike_error()
+            assert len(mini) == distance
+
+    code_stats = sinter.collect(
+        num_workers=11,
+        tasks=tasks,
+        decoders=["pymatching"],
+        max_shots=1_000_000,
+        print_progress=True,
+        # separated = True
+    )
+
+    namefile = "result_memory_" + date.today().isoformat() + str(uuid.uuid1())
+    dump_to_csv(code_stats, namefile)
+
+    plot_error_rate(namefile)

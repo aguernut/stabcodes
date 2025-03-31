@@ -11,7 +11,8 @@ dependencies = [
 "typing_extensions",
 "stim >= 1.12",
 "sinter >= 1.12",
-"qiskit"
+"qiskit",
+"pymatching",
 ]
 
 [project.optional-dependencies]
