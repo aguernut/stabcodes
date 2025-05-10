@@ -4,6 +4,8 @@
 
 from stabcodes.pauli import PauliOperator
 from itertools import count, product
+import sinter
+import stim
 
 
 class MeasureClock:
@@ -132,28 +134,35 @@ class StimExperiment:
         self._circuit += f"DEPOLARIZE1({rate}) " + " ".join(str(i) for i in support) + "\n"
 
     def depolarize2(self, rate, supports):
-        self._circuit += f"DEPOLARIZE2({rate}) " + " ".join(str(qb[0], qb[1]) for qb in supports) + "\n"
+        self._circuit += f"DEPOLARIZE2({rate}) " + " ".join(f"{qb[0]} {qb[1]}" for qb in supports) + "\n"
 
     def stim_x_error_text(self):
         raise NotImplementedError
 
-    def get_task(self, **values):
+    def get_task(self, decoder=None, pass_circuit=False, decoder_options=dict(), **values):
         ordered_keys = values.keys()
         assert set(var._name for var in self._variables.keys()) <= set(ordered_keys), f"All declared variables must be assigned, {set(self._variables.keys()) - set(ordered_keys)} not set"
 
         tasks = []
         for vals in product(*values.values()):
             metadata = dict(zip(ordered_keys, vals))
-            tasks.append(sinter.Task(circuit=stim.Circuit(self._circuit.format(**metadata)),
-                                     json_metadata=metadata))
+            circuit = stim.Circuit(self._circuit.format(**metadata))
+            if decoder is not None:
+                decoder = decoder(circuit)
+            tasks.append(sinter.Task(decoder=decoder, circuit=circuit,
+                         json_metadata=metadata))
 
         return tasks
+
+    def apply_gate(self, gate, support):
+        if gate in {"CX", "CZ", "CY", "SWAP"}:
+            self._circuit += f"{gate} " + " ".join(" ".join(str(qb) for qb in pairs) for pairs in support) + "\n"
+        else:
+            self._circuit += f"{gate} " + " ".join(str(qb) for qb in support) + "\n"
 
 
 if __name__ == "__main__":
     from stabcodes.stabilizer_code import SurfaceCode
-    import stim
-    import sinter
     import uuid
     from stabcodes.visualization import dump_to_csv, plot_error_rate
     from datetime import date
@@ -185,14 +194,7 @@ if __name__ == "__main__":
     for distance in range(3, 12, 2):
         exp = SurfaceMemory(distance)
         tasks.extend(exp.get_task(d=[distance],
-                                  noise=[0.035 * ((0.045/0.035)**(i / 20)) for i in range(21)]))
-
-        with open("debug", "w") as f:
-            circ = exp._circuit.format(noise=0.02)
-            f.write(circ)
-            mini = stim.Circuit(circ).shortest_graphlike_error()
-            assert len(mini) == distance
-
+                                  noise=[0.035 * ((0.045 / 0.035)**(i / 20)) for i in range(21)]))
     code_stats = sinter.collect(
         num_workers=11,
         tasks=tasks,
