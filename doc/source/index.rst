@@ -10,7 +10,7 @@ Stabcodes' documentation
 
 .. note::
 
-   This library was developed during my thesis to simplify my stim experiment. It is *not* in active development. Check out the :doc:`usage` section to :ref:`install <installation>` it.
+   This library was developed during my thesis to simplify my stim experiments. It is *not* in active development. Check out the :doc:`usage` section to :ref:`install <installation>` it.
 
 .. toctree::
    :maxdepth: 2

@@ -6,6 +6,7 @@ from stabcodes.pauli import PauliOperator
 from itertools import count, product
 import sinter
 import stim
+import uuid
 
 
 class MeasureClock:
@@ -147,10 +148,15 @@ class StimExperiment:
         for vals in product(*values.values()):
             metadata = dict(zip(ordered_keys, vals))
             circuit = stim.Circuit(self._circuit.format(**metadata))
-            if decoder is not None:
-                decoder = decoder(circuit)
-            tasks.append(sinter.Task(decoder=decoder, circuit=circuit,
-                         json_metadata=metadata))
+            if decoder is not None and pass_circuit:
+                instantiated_decoder = decoder(circuit)
+            else:
+                instantiated_decoder = decoder
+            decoder_name = None if decoder is None else decoder.__name__ + str(uuid.uuid4())
+            task = sinter.Task(decoder=(decoder_name, instantiated_decoder), circuit=circuit,
+                               json_metadata=metadata)
+            task.instantiated_decoder = instantiated_decoder
+            tasks.append(task)
 
         return tasks
 
@@ -195,11 +201,16 @@ if __name__ == "__main__":
         exp = SurfaceMemory(distance)
         tasks.extend(exp.get_task(d=[distance],
                                   noise=[0.035 * ((0.045 / 0.035)**(i / 20)) for i in range(21)]))
+    custom_decoders = dict(task.decoder for task in tasks)
+    del custom_decoders[None]
+    print(custom_decoders)
+    for task in tasks:
+        task.decoder = task.decoder[0]
     code_stats = sinter.collect(
         num_workers=11,
         tasks=tasks,
         decoders=["pymatching"],
-        max_shots=1_000_000,
+        max_shots=1_000,
         print_progress=True,
         # separated = True
     )
