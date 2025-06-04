@@ -3,6 +3,7 @@
 """
 
 from stabcodes.pauli import PauliOperator
+from stabcodes.visualization import unique_name
 from itertools import count, product
 import sinter
 import stim
@@ -145,6 +146,7 @@ class StimExperiment:
         assert set(var._name for var in self._variables.keys()) <= set(ordered_keys), f"All declared variables must be assigned, {set(self._variables.keys()) - set(ordered_keys)} not set"
 
         tasks = []
+        decoder_names = {}
         for vals in product(*values.values()):
             metadata = dict(zip(ordered_keys, vals))
             circuit = stim.Circuit(self._circuit.format(**metadata))
@@ -153,12 +155,13 @@ class StimExperiment:
             else:
                 instantiated_decoder = decoder
             decoder_name = None if decoder is None else decoder.__name__ + str(uuid.uuid4())
-            task = sinter.Task(decoder=(decoder_name, instantiated_decoder), circuit=circuit,
+            decoder_names[decoder_name] = instantiated_decoder
+            task = sinter.Task(decoder=decoder_name, circuit=circuit,
                                json_metadata=metadata)
             task.instantiated_decoder = instantiated_decoder
             tasks.append(task)
 
-        return tasks
+        return tasks, decoder_names
 
     def apply_gate(self, gate, support):
         if gate in {"CX", "CZ", "CY", "SWAP"}:

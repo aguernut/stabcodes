@@ -5,7 +5,7 @@ import uuid
 
 
 def unique_name(date=True):
-    return datetime.date.today() + "_" + str(uuid.uuid4())
+    return (datetime.date.today() + "_") if date else "" + str(uuid.uuid4())
 
 
 def dump_to_csv(code_stats, namefile):
