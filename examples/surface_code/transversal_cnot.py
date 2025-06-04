@@ -164,27 +164,26 @@ def buddy_measurement(code0, code1, mapping, mode, meas_noise="{meas_noise}", de
 if __name__ == "__main__":
     tasks = []
 
-    for distance in range(3, 6, 2):
+    custom_decoders = {}
+
+    for distance in range(3, 10, 2):
         print(type(TwoStepPymatching))
         exp = SurfaceTransversalCNOT(distance)
-        tasks.extend(exp.get_task(decoder=TwoStepPymatching, pass_circuit=True, d=[distance],
-                                  noise=[0.01 * ((0.05 / 0.01)**(i / 10)) for i in range(11)]))
-    custom_decoders = dict(task.decoder for task in tasks)
-    # del custom_decoders[None]
-    print(custom_decoders)
-    for task in tasks:
-        task.decoder = task.decoder[0]
+        t, decoders = exp.get_task(decoder=TwoStepPymatching, pass_circuit=True, d=[distance],
+                                   noise=[0.01 * ((0.05 / 0.01)**(i / 10)) for i in range(11)])
+        tasks.extend(t)
+        custom_decoders.update(decoders)
+
     code_stats = sinter.collect(
         num_workers=11,
         tasks=tasks,
         decoders=[],
         custom_decoders=custom_decoders,
-        max_shots=10_000,
-        print_progress=True,
-        # separated = True
+        max_shots=100_000,
+        print_progress=True
     )
 
-    namefile = "result_transCNOT"
+    namefile = "result_transCNOT_" + unique_name
     dump_to_csv(code_stats, namefile)
 
     plot_error_rate(namefile)
