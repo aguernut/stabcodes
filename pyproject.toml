@@ -7,7 +7,7 @@ name = "stabcodes"
 version = "0.1"
 dependencies = [
 "networkx",
-"numpy",
+"numpy==1.*",
 "typing_extensions",
 "stim >= 1.12",
 "sinter >= 1.12",
