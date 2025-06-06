@@ -7,7 +7,7 @@ from itertools import chain
 import sinter
 
 
-def SurfaceTransversalCNOT(distance):
+def SurfaceTransversalCZ(distance):
     code1, code2 = SurfaceCode.toric_code(distance, distance), SurfaceCode.toric_code(distance, distance)
     codes = [code1, code2]
     exp = StimExperiment()
@@ -26,10 +26,10 @@ def SurfaceTransversalCNOT(distance):
         exp.measure_refined_phenom(*codes, meas_noise=noise)
         exp.depolarize1(noise)
 
-    exp.apply_gate("CX", [(qb, qb + len(code1.qubits)) for qb in code1.qubits])
+    exp.apply_gate("CZ", [(qb, qb + len(code1.qubits)) for qb in code1.qubits])
     exp.depolarize2(noise, [(qb, qb + len(code1.qubits)) for qb in code1.qubits])
-    mapp = mapping(code1, code2, {0: "X", 1: "X"}, {code1.qubits[0]: code2.qubits[0]})
-    exp.buddy_measurement(code1, code2, mapp, {0: {"X": "X", "Z": ""}, 1: {"X": "", "Z": "Z"}}, noise, 1, 2)
+    mapp = mapping(code1, code2, {0: "X", 1: "Z"}, {code1.qubits[0]: code2.qubits[0]})
+    exp.buddy_measurement(code1, code2, mapp, {0: {"X": "Z", "Z": ""}, 1: {"X": "Z", "Z": ""}}, noise, 1, 2)
 
     for _ in range(distance // 2):
         exp.measure_refined_phenom(code1, meas_noise=noise, detector_decoration="1")
@@ -51,15 +51,17 @@ if __name__ == "__main__":
 
     custom_decoders = {}
 
-    for distance in range(3, 6, 2):
-        exp = SurfaceTransversalCNOT(distance)
+    for distance in range(3, 5, 2):
+        exp = SurfaceTransversalCZ(distance)
         t, decoders = exp.get_task(decoder=TwoStepPymatching, pass_circuit=True, d=[distance],
                                    noise=[0.01 * ((0.05 / 0.01)**(i / 10)) for i in range(11)])
         tasks.extend(t)
+        with open("foo.circ", "w") as f:
+            f.write(str(tasks[0].circuit))
         custom_decoders.update(decoders)
 
     code_stats = sinter.collect(
-        num_workers=7,
+        num_workers=1,
         tasks=tasks,
         decoders=[],
         custom_decoders=custom_decoders,
@@ -67,7 +69,7 @@ if __name__ == "__main__":
 #        print_progress=True
     )
 
-    namefile = "result_transCNOT_" + unique_name()
+    namefile = "result_transCZ_" + unique_name()
     dump_to_csv(code_stats, namefile)
 
     plot_error_rate(namefile)
