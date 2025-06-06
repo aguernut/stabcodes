@@ -8,10 +8,13 @@ def unique_name(date=True):
     return (str(datetime.date.today()) + "_") if date else "" + str(uuid.uuid4())
 
 
-def dump_to_csv(code_stats, namefile):
+def dump_to_csv(code_stats, namefile, clean_after=None):
     with open(namefile + ".csv", "w") as f:
         f.write(sinter._data._csv_out.CSV_HEADER + "\n")
         for stats in code_stats:
+            if clean_after is not None:
+                object.__setattr__(stats, "decoder", stats.decoder[:stats.decoder.index(clean_after)])
+            print(stats.to_csv_line())
             f.write(stats.to_csv_line() + "\n")
 
 

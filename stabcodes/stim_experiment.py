@@ -214,7 +214,7 @@ class StimExperiment:
                 instantiated_decoder = decoder(circuit)
             else:
                 instantiated_decoder = decoder
-            decoder_name = None if decoder is None else decoder.__name__ + str(uuid.uuid4())
+            decoder_name = None if decoder is None else decoder.__name__ + "_" + str(uuid.uuid4())
             decoder_names[decoder_name] = instantiated_decoder
             task = sinter.Task(decoder=decoder_name, circuit=circuit,
                                json_metadata=metadata)
