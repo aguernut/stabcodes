@@ -26,9 +26,9 @@ def SurfaceTransversalCZ(distance):
         exp.measure_refined_phenom(*codes, meas_noise=noise)
         exp.depolarize1(noise)
 
-    exp.apply_gate("CZ", [(qb, qb + len(code1.qubits)) for qb in code1.qubits])
-    exp.depolarize2(noise, [(qb, qb + len(code1.qubits)) for qb in code1.qubits])
     mapp = mapping(code1, code2, {0: "X", 1: "Z"}, {code1.qubits[0]: code2.qubits[0]})
+    exp.apply_gate("CZ", mapp.items())
+    exp.depolarize2(noise, mapp.items())
     exp.buddy_measurement(code1, code2, mapp, {0: {"X": "Z", "Z": ""}, 1: {"X": "Z", "Z": ""}}, noise, 1, 2)
 
     for _ in range(distance // 2):
@@ -51,7 +51,7 @@ if __name__ == "__main__":
 
     custom_decoders = {}
 
-    for distance in range(3, 5, 2):
+    for distance in range(3, 6, 2):
         exp = SurfaceTransversalCZ(distance)
         t, decoders = exp.get_task(decoder=TwoStepPymatching, pass_circuit=True, d=[distance],
                                    noise=[0.01 * ((0.05 / 0.01)**(i / 10)) for i in range(11)])
@@ -61,15 +61,15 @@ if __name__ == "__main__":
         custom_decoders.update(decoders)
 
     code_stats = sinter.collect(
-        num_workers=1,
+        num_workers=7,
         tasks=tasks,
         decoders=[],
         custom_decoders=custom_decoders,
-        max_shots=10_000,
+        max_shots=100_000,
 #        print_progress=True
     )
 
     namefile = "result_transCZ_" + unique_name()
-    dump_to_csv(code_stats, namefile)
+    dump_to_csv(code_stats, namefile, clean_after="_")
 
     plot_error_rate(namefile)
