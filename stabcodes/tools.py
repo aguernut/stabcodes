@@ -84,6 +84,35 @@ def rotate_to_place_first(liste, element):
     liste[:indice], liste[len(liste):] = [], liste[:indice]
 
 
+def reverse_dict(dic):
+    """
+    Unique hashable values of dic are returned as key in the new dictionnary,
+    with new values being the former keys
+
+    Fails if a value in not hashable or if a value is the same for different keys
+
+    See tools.invert_dict if a list of keys having the same value is wanted
+    """
+    new_dic = dict()
+    for (key, value) in dic.items():
+        if isinstance(value, list):
+            for v in value:
+                if v not in new_dic:
+                    try:
+                        new_dic[v] = key
+                    except Exception:
+                        raise TypeError(f"Unhashable type : {type(value)}")
+        else:
+            if value not in new_dic:
+                try:
+                    new_dic[value] = key
+                except Exception:
+                    raise TypeError(f"Unhashable type : {type(value)}")
+            else:
+                raise ValueError(f"Value {repr(value)} is present multiple times")
+    return new_dic
+
+
 def mapping(code0, code1, modes, qb, rev=False):
     seen = set()
     seen2 = set()

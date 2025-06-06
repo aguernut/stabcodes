@@ -121,7 +121,7 @@ class StimExperiment:
         # Measurement of code0
         for basis in mode[0]:
             for stab in code0.iter_stabilizers(basis):
-                stab.measure(code0.measure_count)
+                stab.measure(self._measure_clock)
                 if deb is None:
                     deb = stab.last_measure_time[-1]
                 self._circuit += f"MPP({meas_noise}) " + "*".join(p.kind + str(p.qubit) for p in stab.paulis if p.kind != "I") + "\n"
@@ -136,7 +136,7 @@ class StimExperiment:
         # Measurement of code1
         for basis in mode[1]:
             for stab in code1.iter_stabilizers(basis):
-                stab.measure(code1.measure_count)
+                stab.measure(self._measure_clock)
                 self._circuit += f"MPP({meas_noise}) " + "*".join(p.kind + str(p.qubit) for p in stab.paulis if p.kind != "I") + "\n"
                 buddies = buddies1[basis].get(stab)
 

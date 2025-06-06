@@ -68,6 +68,6 @@ if __name__ == "__main__":
     )
 
     namefile = "result_transCNOT_" + unique_name()
-    dump_to_csv(code_stats, namefile)
+    dump_to_csv(code_stats, namefile, clean_after="_")
 
     plot_error_rate(namefile)

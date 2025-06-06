@@ -2,6 +2,7 @@ from stabcodes._decoding_two_step_pymatching import TwoStepPymatching
 from stabcodes.stabilizer_code import SurfaceCode
 from stabcodes.stim_experiment import StimExperiment, Variable
 from stabcodes.visualization import dump_to_csv, plot_error_rate, unique_name
+from stabcodes.tools import reverse_dict
 import qiskit
 import sinter
 
@@ -22,21 +23,27 @@ def SurfaceTransversalS(distance):
         exp.depolarize1(noise)
 
     s_support = [i + i * distance for i in range(distance)] + [distance**2 + i * distance + (i + 1) % distance for i in range(distance)]
-    CZ_support = [(i * distance + j, j * distance + i) for i in range(distance) for j in range(i + 1, distance)] + [(distance**2 + i * distance + (j + 1) % distance, distance**2 + j * distance + (i+1) % distance) for i in range(distance) for j in range(i+1, distance)]
+    CZ_support = [(i * distance + j, j * distance + i) for i in range(distance) for j in range(i + 1, distance)] + [(distance**2 + i * distance + (j + 1) % distance, distance**2 + j * distance + (i + 1) % distance) for i in range(distance) for j in range(i + 1, distance)]
 
     exp.apply_gate("S", s_support)
     exp.depolarize1(noise, s_support)
     exp.apply_gate("CZ", CZ_support)
     exp.depolarize2(noise, CZ_support)
 
-    qis = qiskit.QuantumCircuit(len(code.qubits))
-    for i in s_support:
-        qis.s(i)
-    for qbs in CZ_support:
-        qis.cz(*qbs)
+    # qis = qiskit.QuantumCircuit(len(code.qubits))
+    # for i in s_support:
+    #     qis.s(i)
+    # for qbs in CZ_support:
+    #     qis.cz(*qbs)
+    # 
+    # code.stabilizers.apply_circuit_to_stabs(qis, True)
+    # code.logical_operators.apply_circuit_to_stabs(qis)
 
-    code.stabilizers.apply_circuit_to_stabs(qis, True)
-    code.logical_operators.apply_circuit_to_stabs(qis)
+    dic = dict(CZ_support)
+    dic.update(reverse_dict(dic))
+    dic.update([(i, i) for i in s_support])
+    exp.buddy_measurement(code, code, dic, {0: {"X": "Z"}, 1: {"Z": ""}}, noise, 1, 2)
+    exp.depolarize1(noise)
 
     codex = code.copy()
     del codex.stabilizers["Z"]
@@ -62,7 +69,7 @@ if __name__ == "__main__":
     tasks = []
     custom_decoders = {}
 
-    for distance in range(3, 12, 2):
+    for distance in range(3, 8, 2):
         exp = SurfaceTransversalS(distance)
         t, decoders = exp.get_task(decoder=TwoStepPymatching, pass_circuit=True, d=[distance],
                                    noise=[0.01 * ((0.02 / 0.01)**(i / 10)) for i in range(11)])
@@ -72,11 +79,11 @@ if __name__ == "__main__":
         custom_decoders.update(decoders)
     
     code_stats = sinter.collect(
-        num_workers=7,
+        num_workers=11,
         tasks=tasks,
         decoders=[],
         custom_decoders=custom_decoders,
-        max_shots=100_000,
+        max_shots=1_000_000,
 #        print_progress=True
     )
     #     t, _ = exp.get_task(d=[distance],
@@ -91,7 +98,7 @@ if __name__ == "__main__":
     #     # separated = True
     # )
 
-    namefile = "result_transHadamard_" + unique_name()
-    dump_to_csv(code_stats, namefile)
+    namefile = "result_transS_" + unique_name()
+    dump_to_csv(code_stats, namefile, clean_after="_")
 
     plot_error_rate(namefile)
