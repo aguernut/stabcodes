@@ -5,7 +5,7 @@
 from typing import Optional, Union
 from collections.abc import Sequence, Mapping
 from stabcodes.recursivemapping import RecursiveMapping
-from stabcodes.pauli import PauliOperator
+from stabcodes.pauli import PauliOperator, Stabilizer2D
 from qiskit import QuantumCircuit
 import numpy as np
 from numpy.typing import NDArray
@@ -31,9 +31,12 @@ class StabGen(RecursiveMapping):
     def nb_qubits(self) -> int:
         return self._nb_qubits
 
-    def apply_circuit_to_stabs(self, circuit: QuantumCircuit):
+    def apply_circuit_to_stabs(self, circuit: QuantumCircuit, _override_safeguard: bool = False):
         for stab in self:
-            stab.apply_circuit(circuit)
+            if isinstance(stab, Stabilizer2D):
+                stab.apply_circuit(circuit, _override_safeguard)
+            else:
+                stab.apply_circuit(circuit)
 
     def to_matrix(self) -> NDArray[np.int64]:
         mat = np.zeros((len(self), self._nb_qubits * 2))

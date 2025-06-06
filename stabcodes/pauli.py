@@ -555,36 +555,41 @@ class PauliOperator:
         ValueError: Unknown Clifford gate: t.
 
         """
+        backup = self.copy()
+        try:
+            for gate in circuit:
+                name = gate.operation.name
+                qubits = gate.qubits
 
-        for gate in circuit:
-            name = gate.operation.name
-            qubits = gate.qubits
+                if name == "cx":
+                    self.apply_CNOT(qubits[0]._index,
+                                    qubits[1]._index)
+                elif name == "cz":
+                    self.apply_CZ(qubits[0]._index,
+                                  qubits[1]._index)
+                elif name == "s":
+                    self.apply_S(qubits[0]._index)
+                elif name == "sdg":
+                    self.apply_SDG(qubits[0]._index)
+                elif name == "h":
+                    self.apply_H(qubits[0]._index)
+                elif name == "swap":
+                    self.apply_SWAP(qubits[0]._index,
+                                    qubits[1]._index)
+                elif name == "id":
+                    pass
+                elif name == "x":
+                    pass
+                elif name == "y":
+                    pass
+                elif name == "z":
+                    pass
+                else:
+                    raise ValueError(f"Unknown Clifford gate: {name}.")
 
-            if name == "cx":
-                self.apply_CNOT(qubits[0]._index,
-                                qubits[1]._index)
-            elif name == "cz":
-                self.apply_CZ(qubits[0]._index,
-                              qubits[1]._index)
-            elif name == "s":
-                self.apply_S(qubits[0]._index)
-            elif name == "sdg":
-                self.apply_SDG(qubits[0]._index)
-            elif name == "h":
-                self.apply_H(qubits[0]._index)
-            elif name == "swap":
-                self.apply_SWAP(qubits[0]._index,
-                                qubits[1]._index)
-            elif name == "id":
-                pass
-            elif name == "x":
-                pass
-            elif name == "y":
-                pass
-            elif name == "z":
-                pass
-            else:
-                raise ValueError(f"Unknown Clifford gate: {name}.")
+        except Exception as e:
+            self.__paulis = backup.__paulis
+            raise e
 
     def apply_CNOT(self, control: int, target: int):
         """Applies a CNOT gate between the `control` qubit and the `target` qubit.
@@ -1963,6 +1968,106 @@ class Stabilizer2D(Stabilizer):
 
         self.__support = None
         self.__support_as_set = None
+
+    def apply_circuit(self, circuit: qiskit.QuantumCircuit, _override_safeguard: Optional[bool] = False):
+        """Applies a :obj:`qiskit.circuit.QuantumCircuit` to the Pauli operator (by conjugation) :mod:`string`.
+
+        This function iterates over the gates of the circuit, applying
+        each of them in turn.
+
+        Parameters
+        ----------
+        circuit : :class:`~qiskit.circuit.QuantumCircuit`
+            Quantum circuit to apply.
+        _override_safeguard : bool, optional
+            Whether to bypass the safeguard ensuring that an entangling two-qubit cannot silently be applied.
+
+        Notes
+        -----
+        If `_override_safeguard` is set to True, the :obj:`Stabilizer2D` will not be
+        in a coherent state and will have to be manually updated.
+
+        Raises
+        ------
+        ValueError
+            A gate of the circuit is not among the defined Clifford gate.
+
+        AttributeError
+            Raised when called with a circuit containing an entangling gate.
+            Use the `_override_safeguard` to bypass, but remember to manually
+            update the `order` field.
+
+        Examples
+        --------
+        >>> P = Stabilizer2D([Z(0)], 2)
+        >>> circuit = qiskit.QuantumCircuit(2)
+        >>> circuit.h(0)
+        <...
+        >>> circuit.cx(0, 1)
+        <...
+        >>> P.apply_circuit(circuit)
+        Traceback (most recent call last):
+            ...
+        AttributeError: CNOT can't be applied directly to a Stabilizer2D, use apply_CNOT_with_caution
+        >>> P == Stabilizer2D([Z(0)], 2)
+        True
+        >>> P.apply_circuit(circuit, True)
+        >>> P.order = [0, 1]
+        >>> P == Stabilizer2D([X(0), X(1)], 2)
+        True
+        >>> circuit.t(0)
+        <...
+        >>> P.apply_circuit(circuit, True)
+        Traceback (most recent call last):
+            ...
+        ValueError: Unknown Clifford gate: t.
+
+        """
+
+        backup = self.copy()
+        try:
+            for gate in circuit:
+                name = gate.operation.name
+                qubits = gate.qubits
+
+                if name == "cx":
+                    if _override_safeguard:
+                        self.apply_CNOT_with_caution(qubits[0]._index,
+                                                     qubits[1]._index)
+                    else:
+                        self.apply_CNOT(qubits[0]._index,
+                                        qubits[1]._index)
+                elif name == "cz":
+                    if _override_safeguard:
+                        self.apply_CZ_with_caution(qubits[0]._index,
+                                                   qubits[1]._index)
+                    else:
+                        self.apply_CZ(qubits[0]._index,
+                                      qubits[1]._index)
+                elif name == "s":
+                    self.apply_S(qubits[0]._index)
+                elif name == "sdg":
+                    self.apply_SDG(qubits[0]._index)
+                elif name == "h":
+                    self.apply_H(qubits[0]._index)
+                elif name == "swap":
+                    self.apply_SWAP(qubits[0]._index,
+                                    qubits[1]._index)
+                elif name == "id":
+                    pass
+                elif name == "x":
+                    pass
+                elif name == "y":
+                    pass
+                elif name == "z":
+                    pass
+                else:
+                    raise ValueError(f"Unknown Clifford gate: {name}.")
+
+        except Exception as e:
+            self._PauliOperator__paulis = backup._PauliOperator__paulis
+            self.order = backup.order
+            raise e
 
 
 def I(qb: int) -> Pauli:  # noqa: E741, E743
