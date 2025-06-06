@@ -3,7 +3,6 @@
 """
 
 from stabcodes.pauli import PauliOperator
-from stabcodes.visualization import unique_name
 from itertools import count, product
 import sinter
 import stim
@@ -86,6 +85,67 @@ class StimExperiment:
     def stim_measure_changing_support_text(self):
         raise NotImplementedError
 
+    def buddy_measurement(self, code0, code1, mapping, mode, meas_noise="{meas_noise}", decoding_step0=1, decoding_step1=1):
+        """
+        Patch must be in code1
+        """
+        # Buddies computation
+
+        # Buddies computation for code0
+        buddies0 = {}
+        for basis in mode[0]:
+            buddies0[basis] = {}
+            for stab in code0.iter_stabilizers(basis):
+                buddies0[basis][stab] = []
+                for buddy_basis in mode[0][basis]:
+                    for buddy in code1.iter_stabilizers(buddy_basis):
+                        if set(mapping[i] for i in stab.support_as_set) >= buddy.support_as_set:
+                            buddies0[basis][stab].append(buddy)
+                            break
+
+        # Buddies computation for code1
+        buddies1 = {}
+        for basis in mode[1]:
+            buddies1[basis] = {}
+            for stab in code1.iter_stabilizers(basis):
+                buddies1[basis][stab] = []
+                for buddy_basis in mode[1][basis]:
+                    for buddy in code0.iter_stabilizers(buddy_basis):
+                        if set(mapping[i] for i in buddy.support_as_set) >= stab.support_as_set:
+                            buddies1[basis][stab].append(buddy)
+                            break
+
+        # Measurements
+        deb = None
+
+        # Measurement of code0
+        for basis in mode[0]:
+            for stab in code0.iter_stabilizers(basis):
+                stab.measure(code0.measure_count)
+                if deb is None:
+                    deb = stab.last_measure_time[-1]
+                self._circuit += f"MPP({meas_noise}) " + "*".join(p.kind + str(p.qubit) for p in stab.paulis if p.kind != "I") + "\n"
+                buddies = buddies0[basis].get(stab)
+
+                if not buddies:
+                    self._circuit += f"DETECTOR({decoding_step0}) rec[-1] rec[{stab.last_measure_time[-2] - stab.last_measure_time[-1] - 1}]\n"
+                else:
+                    for buddy in buddies:
+                        self._circuit += f"DETECTOR({decoding_step0}) rec[-1] rec[{stab.last_measure_time[-2] - stab.last_measure_time[-1] - 1}] rec[{buddy.last_measure_time[-1] - stab.last_measure_time[-1] - 1}]\n"
+
+        # Measurement of code1
+        for basis in mode[1]:
+            for stab in code1.iter_stabilizers(basis):
+                stab.measure(code1.measure_count)
+                self._circuit += f"MPP({meas_noise}) " + "*".join(p.kind + str(p.qubit) for p in stab.paulis if p.kind != "I") + "\n"
+                buddies = buddies1[basis].get(stab)
+
+                if not buddies:
+                    self._circuit += f"DETECTOR({decoding_step1}) rec[-1] rec[{stab.last_measure_time[-2] - stab.last_measure_time[-1] - 1}]\n"
+                else:
+                    for buddy in buddies:
+                        self._circuit += f"DETECTOR({decoding_step1}) rec[-1] rec[{stab.last_measure_time[-2] - stab.last_measure_time[-1] - 1}] rec[{(v if (v := buddy.last_measure_time[-1]) < deb else buddy.last_measure_time[-2]) - stab.last_measure_time[-1] - 1}]\n"
+
     def observable_measurement(self, index: int, operator: PauliOperator, obs_meas_noise=0.0):
         operator.measure(self._measure_clock)
         self._circuit += f"MPP({obs_meas_noise}) " + "*".join(operator[i].kind + str(operator[i].qubit) for i in operator.support) + "\n"
@@ -164,7 +224,7 @@ class StimExperiment:
         return tasks, decoder_names
 
     def apply_gate(self, gate, support):
-        if gate in {"CX", "CZ", "CY", "SWAP"}:
+        if gate in {"CX", "CZ", "CY", "SWAP", "CNOT"}:
             self._circuit += f"{gate} " + " ".join(" ".join(str(qb) for qb in pairs) for pairs in support) + "\n"
         else:
             self._circuit += f"{gate} " + " ".join(str(qb) for qb in support) + "\n"

@@ -84,6 +84,55 @@ def rotate_to_place_first(liste, element):
     liste[:indice], liste[len(liste):] = [], liste[:indice]
 
 
+def mapping(code0, code1, modes, qb, rev=False):
+    seen = set()
+    seen2 = set()
+    traited = set()
+    while len(seen) < len(code0.stabilizers[modes[0]]):
+        for stab in code0.iter_stabilizers(modes[0]):
+            if stab in seen:
+                continue
+            if len(stab.order) == 1:
+                seen.add(stab)
+                continue
+
+            if inter := set(stab.order) & (qb.keys() - traited):
+                if len(inter) == 4:
+                    seen.add(stab)
+                    continue
+
+                trans_inter = set(qb[i] for i in inter)
+                for stab2 in code1.iter_stabilizers(modes[1]):
+                    if stab2 in seen2:
+                        continue
+
+                    if set(stab2.order) & trans_inter:
+                        a = next(iter(inter))
+                        try:
+                            rotate_to_place_first(stab.order, a)
+                            rotate_to_place_first(stab2.order, qb[a])
+                        except ValueError:
+                            print(stab.order, stab2.order)
+                            raise ValueError
+
+                        for (q0, q1) in zip(stab.order, stab2.order):
+                            qb[q0] = q1
+
+                        seen.add(stab)
+                        seen2.add(stab2)
+                        break
+
+                else:
+                    raise NotImplementedError
+                traited.add(a)
+                break
+        else:
+            if len(seen) < len(code0.stabilizers[modes[0]]):
+                raise NotImplementedError
+
+    return qb
+
+
 def symplectic_primitive(n):
     lambd = np.zeros((2 * n, 2 * n))
     lambd[:n, n:] = np.eye(n)
