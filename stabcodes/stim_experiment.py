@@ -3,7 +3,7 @@
 """
 
 from stabcodes.pauli import PauliOperator
-from itertools import count, product
+from itertools import count, product, repeat
 import sinter
 import stim
 import uuid
@@ -45,15 +45,17 @@ class StimExperiment:
         self._codes = None
         self._data_qubits = None
         self._physical_measurement = None
+        self._Bell_physical_measurement = None
 
-    def startup(self, *codes, init_bases="Z"):
+    def startup(self, *codes, init_bases="Z", fidelity=0):
         if len(init_bases) != len(codes):
             raise ValueError("An initialization basis for each code must be specified.")
 
         self._measure_clock = MeasureClock()
         self._physical_measurement = {}
+        self._Bell_physical_measurement = {}
         self._codes = list(codes)
-        N = sum(c.num_qubits for c in codes)
+        N = sum(c.num_qubits for c in codes) + fidelity
         self._data_qubits = range(N)
         qb_shift = 0
         for c, init_basis in zip(codes, init_bases):
@@ -62,6 +64,8 @@ class StimExperiment:
             c._stabilizers.reset()
             c._logical_operators.reset()
             self._circuit += f"R{init_basis} " + " ".join(str(i) for i in self._data_qubits) + "\n"
+
+        return tuple(range(qb_shift, N)) if fidelity else None
 
     def add_variables(self, newvar, value=None):
         return self._variables.setdefault(newvar, value)
@@ -182,6 +186,37 @@ class StimExperiment:
                 raise RuntimeError(f"Qubit {qb} was measured in basis {basis}, not {operator[qb].kind}.")
 
         self._circuit += f"OBSERVABLE_INCLUDE({index}) " + " ".join(f"rec[{self._physical_measurement[qb][1] - current - 1}]" for qb in operator.support) + "\n"
+
+    def destructive_measurement_fidelity(self, basis, fidelity, to_measure=None):
+        if to_measure is None:
+            to_measure = self._data_qubits
+
+        self._circuit += "MPP" + " ".join(f"{basis}{fidelity}*{basis}{str(qb)}" for qb in to_measure)
+        for i in to_measure:
+            self._Bell_physical_measurement[(basis, i)] = next(self._measure_clock)
+
+    def reconstruct_stabilizers_fidelity(self, *codes, detector_decoration=None):
+        current = self._measure_clock.current
+        if not codes:
+            codes = self._codes
+
+        for c in codes:
+            for s in c.stabilizers:
+                for qb in s.support:
+                    (basis, meas_time) = self._physical_measurement.get(qb, (None, None))
+                    if basis is None or basis != s[qb].kind:
+                        break
+                else:
+                    self._circuit += "DETECTOR" + (f"({detector_decoration}) " if detector_decoration else " ") + " ".join(f"rec[{self._physical_measurement[qb][1] - current - 1}]" for qb in s.support) + f" rec[{s.last_measure_time[-1] - current - 1}]\n"
+
+    # def reconstruct_observable_fidelity(self, index, operator):
+    #     current = self._measure_clock.current
+    #     for qb in operator.support:
+    #         (basis, meas_time) = self._physical_measurement.get(qb, (None, None))
+    #         if basis is None:
+    #             raise RuntimeError(f"Qubit {qb} as not been physically measured yet.")
+    #         if basis != operator[qb].kind:
+    #             raise RuntimeError(f"Qubit {qb} was measured in basis {basis}, not {operator[qb].kind}.")
 
     def stim_realistic_logical_measure_text(self):
         raise NotImplementedError
