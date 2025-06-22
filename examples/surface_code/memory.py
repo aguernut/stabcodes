@@ -55,22 +55,58 @@ def SurfaceMemoryFidelity(distance):
 
     exp.destructive_measurement_fidelity("Z", fid1)
     exp.destructive_measurement_fidelity("X", fid1)
+    exp.reconstruct_stabilizers_fidelity()
+
+    for i, log in enumerate(code.logical_operators):
+        exp.reconstruct_observable_fidelity(i, log)
+
+    return exp
+
+
+def SurfaceMemoryBell(distance):
+    code, perfect_code = SurfaceCode.toric_code(distance, distance), SurfaceCode.toric_code(distance, distance)
+    exp = StimExperiment()
+    noise = Variable("noise")
+    exp.add_variables(noise)
+    exp.startup(code, perfect_code, init_bases="ZZ")
+
+    exp.destructive_measurement_Bell(code.qubits, perfect_code.qubits, "Z")
+    exp.destructive_measurement_Bell(code.qubits, perfect_code.qubits, "X")
+
+    for i, (obs1, obs2) in enumerate(zip(code.logical_operators, perfect_code.logical_operators)):
+        exp.reconstruct_observable_Bell(obs1, obs2, i)
+
+    exp.measure_refined_phenom(code, meas_noise=noise, project="")
+    exp.measure_refined_phenom(perfect_code, meas_noise=0.0, project="")
+
+    for _ in range(distance+1):
+        exp.measure_refined_phenom(code, meas_noise=noise)
+        exp.depolarize1(noise, code.qubits)
+
+    exp.destructive_measurement_Bell(code.qubits, perfect_code.qubits, "Z")
+    exp.destructive_measurement_Bell(code.qubits, perfect_code.qubits, "X")
+    exp.reconstruct_stabilizers_Bell(code, perfect_code)
+
+    for i, (obs1, obs2) in enumerate(zip(code.logical_operators, perfect_code.logical_operators)):
+        exp.reconstruct_observable_Bell(obs1, obs2, i)
+
+    return exp
 
 
 if __name__ == "__main__":
 
     tasks = []
 
-    for distance in range(3, 12, 2):
-        exp = SurfaceMemory(distance)
+    for distance in range(3, 8, 2):
+        exp = SurfaceMemoryBell(distance)
         t, _ = exp.get_task(d=[distance],
-                            noise=[0.035 * ((0.045 / 0.035)**(i / 20)) for i in range(21)])
+                            noise=[0.02 * ((0.05 / 0.02)**(i / 30)) for i in range(31)])
         tasks.extend(t)
     code_stats = sinter.collect(
         num_workers=11,
         tasks=tasks,
         decoders=["pymatching"],
-        max_shots=1_000,
+        max_shots=100_000,
         print_progress=True,
         # separated = True
     )

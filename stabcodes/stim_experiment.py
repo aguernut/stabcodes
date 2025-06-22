@@ -2,7 +2,7 @@
 
 """
 
-from stabcodes.pauli import PauliOperator
+from stabcodes.pauli import PauliOperator, Pauli
 from itertools import count, product, repeat
 import sinter
 import stim
@@ -59,11 +59,12 @@ class StimExperiment:
         self._data_qubits = range(N)
         qb_shift = 0
         for c, init_basis in zip(codes, init_bases):
+            c._measure_count = self._measure_clock
             c.shift_qubits(qb_shift, N)
             qb_shift += len(c.qubits)
             c._stabilizers.reset()
             c._logical_operators.reset()
-            self._circuit += f"R{init_basis} " + " ".join(str(i) for i in self._data_qubits) + "\n"
+        self._circuit += f"R{init_basis} " + " ".join(str(i) for i in self._data_qubits) + "\n"
 
         return tuple(range(qb_shift, N)) if fidelity else None
 
@@ -155,6 +156,9 @@ class StimExperiment:
         self._circuit += f"MPP({obs_meas_noise}) " + "*".join(operator[i].kind + str(operator[i].qubit) for i in operator.support) + "\n"
         self._circuit += f"OBSERVABLE_INCLUDE({index}) rec[-1]\n"
 
+    def observable_Pauli_target(self, index: int, operator: PauliOperator):
+        self._circuit += f"OBSERVABLE_INCLUDE({index}) " + " ".join(operator[qb].kind + str(qb) for qb in operator.support) + "\n"
+
     def destructive_measurement(self, basis, to_measure=None):
         if to_measure is None:
             to_measure = self._data_qubits
@@ -187,42 +191,66 @@ class StimExperiment:
 
         self._circuit += f"OBSERVABLE_INCLUDE({index}) " + " ".join(f"rec[{self._physical_measurement[qb][1] - current - 1}]" for qb in operator.support) + "\n"
 
-    def destructive_measurement_fidelity(self, basis, fidelity, to_measure=None):
-        if to_measure is None:
-            to_measure = self._data_qubits
+    def destructive_measurement_Bell(self, to_measure1, to_measure2, basis, basis2=None):
+        assert len(to_measure1) == len(to_measure2)
 
-        self._circuit += "MPP" + " ".join(f"{basis}{fidelity}*{basis}{str(qb)}" for qb in to_measure)
-        for i in to_measure:
-            self._Bell_physical_measurement[(basis, i)] = next(self._measure_clock)
+        if basis2 is None:
+            basis2 = basis
 
-    def reconstruct_stabilizers_fidelity(self, *codes, detector_decoration=None):
+        self._circuit += f"MPP " + " ".join(basis + str(i) + "*" + basis2 + str(j) for i, j in zip(to_measure1, to_measure2)) + "\n"
+        for i, j in zip(to_measure1, to_measure2):
+            self._Bell_physical_measurement[Pauli(basis, i)] = (Pauli(basis2, j), next(self._measure_clock))
+
+    def reconstruct_stabilizers_Bell(self, code1, code2, detector_decoration=None):
         current = self._measure_clock.current
-        if not codes:
-            codes = self._codes
 
-        for c in codes:
-            for s in c.stabilizers:
-                for qb in s.support:
-                    (basis, meas_time) = self._physical_measurement.get(qb, (None, None))
-                    if basis is None or basis != s[qb].kind:
-                        break
-                else:
-                    self._circuit += "DETECTOR" + (f"({detector_decoration}) " if detector_decoration else " ") + " ".join(f"rec[{self._physical_measurement[qb][1] - current - 1}]" for qb in s.support) + f" rec[{s.last_measure_time[-1] - current - 1}]\n"
+        for s1, s2 in zip(code1.stabilizers, code2.stabilizers):
+            supp1 = {s1[qb] for qb in s1.support}
+            supp2 = {s2[qb] for qb in s2.support}
+            for pauli in supp1:
+                if self._Bell_physical_measurement[pauli][0] not in supp2:
+                    raise RuntimeError(f"No Bell measurement happened with {pauli} as primary target")
+            self._circuit += "DETECTOR" + (f"({detector_decoration}) " if detector_decoration else " ") + " ".join(f"rec[{self._Bell_physical_measurement[pauli][1] - current - 1}]" for pauli in supp1) + f" rec[{s1.last_measure_time[-1] - current - 1}]" + f" rec[{s2.last_measure_time[-1] - current - 1}]\n"
 
+    def reconstruct_observable_Bell(self, observable1, observable2, index=None):
+        current = self._measure_clock.current
+        supp1 = {observable1[qb] for qb in observable1.support}
+        supp2 = {observable2[qb] for qb in observable2.support}
+        for pauli in supp1:
+            if self._Bell_physical_measurement[pauli][0] not in supp2:
+                raise RuntimeError(f"No Bell measurement happened with {pauli} as primary target")
+        self._circuit += f"OBSERVABLE_INCLUDE({index}) " + " ".join(f"rec[{self._Bell_physical_measurement[pauli][1] - current - 1}]" for pauli in supp1) + "\n"
+
+    # def destructive_measurement_fidelity(self, basis, fidelity, to_measure=None):
+    #     if to_measure is None:
+    #         to_measure = self._data_qubits
+    # 
+    #     self._circuit += "MPP " + " ".join(f"{basis}{fidelity}*{basis}{str(qb)}" for qb in to_measure) + "\n"
+    #     for i in to_measure:
+    #         self._Bell_physical_measurement[(basis, i)] = next(self._measure_clock)
+    # 
+    # def reconstruct_stabilizers_fidelity(self, *codes, detector_decoration=None):
+    #     current = self._measure_clock.current
+    #     if not codes:
+    #         codes = self._codes
+    # 
+    #     for c in codes:
+    #         for s in c.stabilizers:
+    #             for qb in s.support:
+    #                 meas_time = self._Bell_physical_measurement.get((s[qb].kind, qb), None)
+    #                 if meas_time is None:
+    #                     raise ValueError("Qubit {qb} hasn't been measured in the basis {s[qb].kind}")
+    #             else:
+    #                 self._circuit += "DETECTOR" + (f"({detector_decoration}) " if detector_decoration else " ") + " ".join(f"rec[{self._Bell_physical_measurement[s[qb].kind, qb] - current - 1}]" for qb in s.support) + f" rec[{s.last_measure_time[-1] - current - 1}]\n"
+    # 
     # def reconstruct_observable_fidelity(self, index, operator):
     #     current = self._measure_clock.current
     #     for qb in operator.support:
-    #         (basis, meas_time) = self._physical_measurement.get(qb, (None, None))
-    #         if basis is None:
-    #             raise RuntimeError(f"Qubit {qb} as not been physically measured yet.")
-    #         if basis != operator[qb].kind:
-    #             raise RuntimeError(f"Qubit {qb} was measured in basis {basis}, not {operator[qb].kind}.")
-
-    def stim_realistic_logical_measure_text(self):
-        raise NotImplementedError
-
-    def stim_realistic_Bell_logical_measure_text(self):
-        raise NotImplementedError
+    #         meas_time = self._Bell_physical_measurement.get((operator[qb].kind, qb), None)
+    #         if meas_time is None:
+    #             raise RuntimeError(f"Qubit {qb} as not been physically measured yet in basis {operator[qb].kind}.")
+    # 
+    #     self._circuit += f"OBSERVABLE_INCLUDE({index}) " + " ".join(f"rec[{self._Bell_physical_measurement[operator[qb].kind, qb] - current - 1}]" for qb in operator.support) + "\n"
 
     def depolarize1(self, rate, support=None):
         if support is None:
