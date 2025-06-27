@@ -209,7 +209,7 @@ class StimExperiment:
             supp2 = {s2[qb] for qb in s2.support}
             for pauli in supp1:
                 if self._Bell_physical_measurement[pauli][0] not in supp2:
-                    raise RuntimeError(f"No Bell measurement happened with {pauli} as primary target")
+                    raise RuntimeError(f"No Bell measurement with {pauli} as primary target have secondary target in {supp2}.")
             self._circuit += "DETECTOR" + (f"({detector_decoration}) " if detector_decoration else " ") + " ".join(f"rec[{self._Bell_physical_measurement[pauli][1] - current - 1}]" for pauli in supp1) + f" rec[{s1.last_measure_time[-1] - current - 1}]" + f" rec[{s2.last_measure_time[-1] - current - 1}]\n"
 
     def reconstruct_observable_Bell(self, observable1, observable2, index=None):
