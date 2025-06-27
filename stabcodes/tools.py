@@ -162,6 +162,45 @@ def mapping(code0, code1, modes, qb, rev=False):
     return qb
 
 
+def transpositions_from_mapping(mapping: dict[int, int]):
+    seen = [False] * len(mapping)
+    transpositions = []
+
+    for v in mapping:
+        if seen[v]:
+            continue
+
+        seen[v] = True
+        cycle = [v]
+        while len(cycle) == 1 or cycle[-1] != cycle[0]:
+            v = mapping[v]
+            seen[v] = True
+            cycle.append(v)
+
+        cycle.pop()
+
+        if len(cycle) > 1:
+            transpositions.extend(list(couples(cycle)))
+        print(cycle)
+
+    return transpositions
+
+
+def couples(iterable):
+    """
+    Iterate over all the pairs in (s0, s1), (s1, s2)...
+    """
+    iterable = iter(iterable)
+    try:
+        a = next(iterable)
+        while True:
+            b = next(iterable)
+            yield (a, b)
+            a = b
+    except StopIteration:
+        return
+
+
 def symplectic_primitive(n):
     lambd = np.zeros((2 * n, 2 * n))
     lambd[:n, n:] = np.eye(n)

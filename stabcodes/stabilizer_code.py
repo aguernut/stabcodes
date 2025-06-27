@@ -19,14 +19,16 @@ class StabilizerCode:
     def __init__(self, stabilizers: list[Stabilizer],
                  logical_operators: dict[str, PauliOperator],
                  qubits: range,
-                 stab_relations: Optional[list[tuple[list[int], list[int]]]] = None):
+                 stab_relations: Optional[list[tuple[list[int], list[int]]]] = None,
+                 no_check: bool = False):
 
         self._stabilizers = StabGen(stabilizers)
         self._qubits = qubits
         self._logical_operators = StabGen(logical_operators)
         self._stab_relations = [] if stab_relations is None else stab_relations
 
-        self.check()
+        if not no_check:
+            self.check()
 
     def shift_qubits(self, n: int, extend_to=None):
         self._qubits = range(self._qubits.start + n, self._qubits.stop + n)
@@ -41,7 +43,8 @@ class StabilizerCode:
 
     def copy(self):
         return type(self)(copy(self._stabilizers), copy(self._logical_operators),
-                          copy(self._qubits), copy(self._stab_relations))
+                          copy(self._qubits), copy(self._stab_relations),
+                          no_check=True)
 
     @property
     def num_stabilizers(self):
@@ -276,13 +279,14 @@ class SurfaceCode(StabilizerCode):
         else:
             return iter(self._stabilizers[kind])
 
-    def dehn_twist(self, guide, auxiliary=None, to_avoid={}, force_cnot=[]):
+    def dehn_twist(self, guide, auxiliary=None, to_avoid={}, force_cnot=[], check=True):
         """
         guide: A Z (non self-intersecting) logical operator of the code
         auxiliary: One qubit within the Xoperator parallel to the guide,
         indicating the side on which the twist is performed
         """
-        assert self.is_logical_operator(PauliOperator.from_support(guide, "Z", len(self._qubits)))
+        if check:
+            assert self.is_logical_operator(PauliOperator.from_support(guide, "Z", len(self._qubits)))
         if not guide:
             return [], [], None
         guide_as_set, ordered_guide, ordered_pairs, auxiliary = self._compute_ordered_pairs(guide, auxiliary, to_avoid)
