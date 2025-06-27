@@ -126,8 +126,6 @@ if __name__ == "__main__":
 
     for distance in range(3, 8, 2):
         exp = SurfaceTransversalCNOTBell(distance)
-        with open("foo.txt", "w") as f:
-            f.write(exp._circuit)
         t, decoders = exp.get_task(decoder=TwoStepPymatching, pass_circuit=True, d=[distance],
                                    noise=[0.01 * ((0.05 / 0.01)**(i / 10)) for i in range(11)])
         tasks.extend(t)
