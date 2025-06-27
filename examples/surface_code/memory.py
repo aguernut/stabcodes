@@ -1,7 +1,7 @@
 from stabcodes.stabilizer_code import SurfaceCode
 from stabcodes.stim_experiment import StimExperiment, Variable
 from stabcodes.visualization import dump_to_csv, plot_error_rate, unique_name
-from stabcodes.paulis import PauliOperator
+from stabcodes.pauli import PauliOperator
 import sinter
 
 
@@ -79,7 +79,7 @@ def SurfaceMemoryBell(distance):
     exp.measure_refined_phenom(code, meas_noise=noise, project="")
     exp.measure_refined_phenom(perfect_code, meas_noise=0.0, project="")
 
-    for _ in range(distance+1):
+    for _ in range(distance):
         exp.measure_refined_phenom(code, meas_noise=noise)
         exp.depolarize1(noise, code.qubits)
 
