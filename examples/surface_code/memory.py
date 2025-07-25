@@ -100,18 +100,19 @@ if __name__ == "__main__":
     for distance in range(3, 8, 2):
         exp = SurfaceMemoryBell(distance)
         t, _ = exp.get_task(d=[distance],
-                            noise=[0.02 * ((0.05 / 0.02)**(i / 30)) for i in range(31)])
+                            noise=[0.02 * ((0.05 / 0.02)**(i / 10)) for i in range(11)])
         tasks.extend(t)
     code_stats = sinter.collect(
         num_workers=11,
         tasks=tasks,
         decoders=["pymatching"],
-        max_shots=100_000,
+        max_shots=10_000,
         print_progress=True,
+        count_observable_error_combos=True,
         # separated = True
     )
 
     namefile = "result_memory_" + unique_name()
     dump_to_csv(code_stats, namefile)
 
-    plot_error_rate(namefile)
+    plot_error_rate(namefile, split=True)

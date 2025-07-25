@@ -137,10 +137,11 @@ if __name__ == "__main__":
         decoders=[],
         custom_decoders=custom_decoders,
         max_shots=10_000,
+        count_observable_error_combos=True,
 #        print_progress=True
     )
 
     namefile = "result_transCNOT_" + unique_name()
     dump_to_csv(code_stats, namefile, clean_after="_")
 
-    plot_error_rate(namefile)
+    plot_error_rate(namefile, split=True)
