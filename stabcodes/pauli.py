@@ -1032,16 +1032,6 @@ class PauliOperator:
         """
         return self.to_symplectic_vector(zfirst=True)
 
-    # def to_array(self) -> np.ndarray[str]:
-    #     array = np.zeros((1, self.nb_qubits))
-    #     for (i, pauli) in enumerate(self.paulis):
-    #         if pauli.kind in ("X", "Z"):
-    #             array[0, i] = 1
-    #         if pauli.kind in ("Y",):
-    #             array[0, i] = np.nan
-    #
-    #     return array
-
     def to_symplectic_vector(self, zfirst: bool = False) -> NDArray[np.int64]:
         """Returns the expression of this Pauli operator as a symplectic vector.
 
@@ -1360,9 +1350,10 @@ class Stabilizer2D(Stabilizer):
     number of qubits.
 
     The `order` field need to be kept updated by the user, as there is no way to automatically
-    decide of a new ordering for a stabilizer whose support as changed. Thus,
-    If your stabilizer code is not 2D local code over an orientable surface, you
-    might prefer using :class:`PauliOperator` for your stabilizer operators.
+    decide of a new ordering for a stabilizer whose support as changed. Thus, if your
+    stabilizer code is not 2D local code over an orientable surface, or if you do not care much
+    about the stabilizer supports, you might prefer using :class:`Stabilizer`
+    for your stabilizer operators.
 
     Examples
     --------
