@@ -19,7 +19,7 @@ class StabGen(RecursiveMapping):
 
     Elements are stored hierarchically with string labels characterizing them
     (such as "X" or "Z" for CSS codes, "red" or "blue" or "green" as a second
-     level indexing for color code, etc).
+    level indexing for color code, etc).
 
     Notes
     -----
@@ -43,7 +43,7 @@ class StabGen(RecursiveMapping):
         Parameters
         ----------
         value: Union[Sequence[PauliOperator], Mapping[str, PauliOperator]], optional
-            When :onj:`None`, builds the empty :onj:`StabGen`.
+            When :obj:`None`, builds the empty :obj:`StabGen`.
             When given a sequence of :obj:`PauliOperator`s, builds a base level :obj:`StabGen` containing its elements.
             When given a :obj:`StabGen`, performs a shallow copy.
             When given a mapping, recursively calls itself to build the :obj:`StabGen`.
