@@ -1,5 +1,5 @@
 """
-
+Implements a custom data structure midway between a :obj:`MutableMapping` and a :obj:`MutableSequence`.
 """
 
 
@@ -42,10 +42,10 @@ class RecursiveMapping(MutableMapping, MutableSequence):
         Parameters
         ----------
         value: Union[Sequence, Mapping], optional
-            When :obj:`None`, build the empty :obj:`RecursiveMapping`.
-            When given a sequence, build a base level :obj:`RecursiveMapping` containing its elements.
-            When given a :obj:`RecursiveMapping`, perform a shallow copy.
-            When given a mapping, recursively call itself to build the :obj:`RecursiveMapping`.
+            When :obj:`None`, builds the empty :obj:`RecursiveMapping`.
+            When given a sequence, builds a base level :obj:`RecursiveMapping` containing its elements.
+            When given a :obj:`RecursiveMapping`, performs a shallow copy.
+            When given a mapping, recursively calls itself to build the :obj:`RecursiveMapping`.
 
         Raises
         ------
