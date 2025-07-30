@@ -1,9 +1,9 @@
 """
-
+Define the base class for stabilizer codes and their derivatives (surface codes and color codes)
 """
 
 
-from typing import Optional
+from typing import Optional, Union, Sequence, Mapping
 from math import prod
 from copy import copy, deepcopy
 from itertools import count, product, dropwhile, takewhile
@@ -12,15 +12,60 @@ from stabcodes.pauli import Stabilizer2D, Stabilizer, PauliOperator, X, Z, I
 from stabcodes.stabgen import StabGen
 from stabcodes.tools import symplectic_primitive
 import numpy as np
+from numpy.typing import NDArray
 
 
 class StabilizerCode:
+    """
+    Base class hosting the logic common to all the stabilizer codes.
 
-    def __init__(self, stabilizers: list[Stabilizer],
-                 logical_operators: dict[str, PauliOperator],
+    Notes
+    -----
+    While this can be instantiated, it is better to overload this class to include
+    a constructor to build a whole parametrized family of codes.
+
+    Examples
+    --------
+    >>> SX = [Stabilizer([X(0), X(1), X(2), X(3)], 4)]
+    >>> SZ = [Stabilizer([Z(0), Z(1), Z(2), Z(3)], 4)]
+    >>> LX = [PauliOperator([X(0), X(1)], 4), PauliOperator([X(0), X(2)], 4)]
+    >>> LZ = [PauliOperator([Z(0), Z(2)], 4), PauliOperator([Z(0), Z(1)], 4)]
+    >>> code = StabilizerCode({"X": SX, "Z": SZ}, {"X": LX, "Z": LZ}, range(4))
+    >>> code.check()  # Are the commutation relations correct ?
+
+    """
+    def __init__(self, stabilizers: Union[Sequence[Stabilizer], Mapping[str, Stabilizer]],
+                 logical_operators: Mapping[str, PauliOperator],
                  qubits: range,
                  stab_relations: Optional[list[tuple[list[int], list[int]]]] = None,
                  no_check: bool = False):
+        """Builds a stabilizer code from two collections of :class:`PauliOperator` s.
+        
+        Parameters
+        ----------
+        stabilizers: Union[Sequence[Stabilizer], Mapping[str, Stabilizer]
+            Collection of stabilizer operators of the code.
+        logical_operators:
+            Mapping of logical Pauli operators of the code. X and Z logical operators
+            must be specified and anticommute with their counterpart.
+        qubits: range
+            Range of qubit indices composing this code.
+        stab_relations: list[tuple[list[int], list[int]]], optional
+            Collections of stabilizer indices whose multiplication lead to the same
+            value.
+        no_check: bool
+            Whether to check the consistency of the instantiated object. Faster with True,
+            but you won't be warned if something is wrong with your stabilizer code.
+
+        Examples
+        --------
+        >>> SX = [Stabilizer([X(0), X(1)], 3), Stabilizer([X(0), X(2)], 3), Stabilizer([X(1), X(2)], 3)]
+        >>> SZ = []
+        >>> LX = [PauliOperator([X(0)], 3)]
+        >>> LZ = [PauliOperator([Z(0), Z(1), Z(2)], 3)]
+        >>> code = StabilizerCode({"X": SX, "Z": SZ}, {"X": LX, "Z": LZ}, range(3), [([0, 1], [2])])
+        
+        """
 
         self._stabilizers = StabGen(stabilizers)
         self._qubits = qubits
@@ -31,6 +76,16 @@ class StabilizerCode:
             self.check()
 
     def shift_qubits(self, n: int, extend_to=None):
+        """Shifts all the qubit indices by an integer value.
+
+        Parameters
+        ----------
+        n: int
+            Integer value by which the qubit indices must be offset.
+        extend_to: int, optional
+            Final maximum value for the qubit indices in the whole context (e.g. in other codes)
+
+        """
         self._qubits = range(self._qubits.start + n, self._qubits.stop + n)
         if extend_to is None:
             extend_to = self._qubits.stop
@@ -41,33 +96,43 @@ class StabilizerCode:
         self._logical_operators.extend(m)
         self._logical_operators.itranslate(n=n)
 
-    def copy(self):
+    def copy(self) -> "StabilizerCode":
+        """
+        Returns a copy of this code.
+
+        """
         return type(self)(copy(self._stabilizers), copy(self._logical_operators),
                           copy(self._qubits), copy(self._stab_relations),
                           no_check=True)
 
     @property
-    def num_stabilizers(self):
+    def num_stabilizers(self) -> int:
+        """Number of stabilizers of the code."""
         return len(self._stabilizers)
 
     @property
-    def num_qubits(self):
+    def num_qubits(self) -> int:
+        """Number of physical qubits used by the code."""
         return len(self._qubits)
 
     @property
-    def qubits(self):
+    def qubits(self) -> range:
+        """Collection of physical qubit indices used by this code."""
         return range(self._qubits.start, self._qubits.stop)
 
     @property
-    def num_logical_qubits(self):
+    def num_logical_qubits(self) -> int:
+        """Number of logical qubits of the code."""
         return self.num_qubits - self.num_stabilizers + len(self._stab_relations)
 
     @property
-    def stabilizers(self):
+    def stabilizers(self) -> StabGen:
+        """Collection of stabilizer operators used by this code."""
         return self._stabilizers
 
     @property
-    def logical_operators(self):
+    def logical_operators(self) -> StabGen:
+        """Collection of logical Pauli operators of this code."""
         return self._logical_operators
 
     def __getitem__(self, index):
@@ -77,6 +142,14 @@ class StabilizerCode:
         return self._stabilizers.__setitem__(index, value)
 
     def check(self):
+        """
+        Checks the soundness of this stabilizer code.
+
+        Raises
+        ------
+        ValueError
+            Something inconsistent appears in the definition of the stabilizer code.
+        """
         if {"X", "Z"} != set(self.logical_operators.keys()):
             raise ValueError("Provided logical operators must be split into \"X\" and \"Z\" types.")
         for s in self._stabilizers:
@@ -111,23 +184,45 @@ class StabilizerCode:
                      start=PauliOperator(nb_qubits=len(self._qubits))), \
                 "Stabilizer relations do not check out"
 
-    def stab_to_matrix(self):
+    def stab_to_matrix(self) -> NDArray[np.int64]:
+        """
+        Returns a symplectic view of the stabilizer of this code.
+
+        """
         return self._stabilizers.to_matrix()
 
-    def is_logical_operator(self, operator: PauliOperator):
+    def is_logical_operator(self, operator: PauliOperator) -> bool:
+        """
+        Returns whether the given Pauli operator is a valid logical operator of this code.
+
+        Parameters
+        ----------
+        operator: PauliOperator
+            Operator whose commutation with the stabilizers will be checked.
+
+        """
         return all(operator.commute(s) for s in self._stabilizers)
 
     def iter_stabilizers(self):
+        """
+        Iterates over the stabilizers of this code.
+
+        """
         return iter(self._stabilizers)
 
     def iter_logical_operators(self, kind=None):
+        """
+        Iterates of the canonical logical Pauli operators of this code.
+
+        Parameters
+        ----------
+        kind: str
+            Can be "X" or "Z". Filter the kind of logical operators over which to iterate.
+        """
         if kind is None:
             return iter(self._logical_operators)
         else:
             return iter(self._logical_operators[kind])
-
-    def symplectic_matrix(self):
-        raise NotImplementedError
 
 
 class SurfaceCode(StabilizerCode):
