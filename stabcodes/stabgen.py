@@ -1,5 +1,5 @@
 """
-Specialization of the :obj:`RecursiveMapping` data structure to hold stabilizers and Pauli operators.
+Specialization of the :class:`RecursiveMapping` data structure to hold stabilizers and Pauli operators.
 The intent is to have the stabilizers accessible both through indexing or filtering their Pauli type or possibly their color.
 """
 
@@ -14,7 +14,7 @@ from numpy.typing import NDArray
 
 class StabGen(RecursiveMapping):
     """
-    A :obj:`RecursiveMapping` designed to hold :obj:`PauliOperator`s and :obj:`Stabilizer`s
+    A :class:`RecursiveMapping` designed to hold :class:`PauliOperator` and :class:`Stabilizer`
     in the context of a stabilizer code.
 
     Elements are stored hierarchically with string labels characterizing them
@@ -38,20 +38,20 @@ class StabGen(RecursiveMapping):
     """
 
     def __init__(self, value: Optional[Union[Sequence[PauliOperator], Mapping[str, PauliOperator]]] = None):
-        """Builds a StabGen from a sequence or a possibly recursive uniform mapping, ending with sequences of :obj:`Paulioperator`s.
+        """Builds a StabGen from a sequence or a possibly recursive uniform mapping, ending with sequences of :class:`Paulioperator`.
 
         Parameters
         ----------
         value: Union[Sequence[PauliOperator], Mapping[str, PauliOperator]], optional
-            When :obj:`None`, builds the empty :obj:`StabGen`.
-            When given a sequence of :obj:`PauliOperator`s, builds a base level :obj:`StabGen` containing its elements.
-            When given a :obj:`StabGen`, performs a shallow copy.
-            When given a mapping, recursively calls itself to build the :obj:`StabGen`.
+            When :obj:`None`, builds the empty :class:`StabGen`.
+            When given a sequence of :class:`PauliOperator`, builds a base level :class:`StabGen` containing its elements.
+            When given a :class:`StabGen`, performs a shallow copy.
+            When given a mapping, recursively calls itself to build the :class:`StabGen`.
 
         Raises
         ------
         TypeError
-            Raised when non-uniform keys would be used, or a non-:obj:`PauliOperator` element is given.
+            Raised when non-uniform keys would be used, or a non-:class:`PauliOperator` element is given.
         ValueError
             Raised if some elements do not affect the same number of qubits.
 
@@ -84,7 +84,7 @@ class StabGen(RecursiveMapping):
         return self._nb_qubits
 
     def apply_circuit_to_stabs(self, circuit: QuantumCircuit, _override_safeguard: bool = False):
-        """Apply the given circuit to all the base-level :obj:`PauliOperator` by conjugation.
+        """Apply the given circuit to all the base-level :class:`PauliOperator` by conjugation.
 
         Parameters
         ----------
@@ -95,7 +95,7 @@ class StabGen(RecursiveMapping):
 
         Notes
         -----
-        If `_override_safeguard` is set to True, the :obj:`Stabilizer2D` will not be
+        If `_override_safeguard` is set to True, the :class:`Stabilizer2D` will not be
         in a coherent state and will have to be manually updated.
 
         Examples
