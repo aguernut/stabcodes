@@ -149,6 +149,7 @@ class StabilizerCode:
         ------
         ValueError
             Something inconsistent appears in the definition of the stabilizer code.
+
         """
         if {"X", "Z"} != set(self.logical_operators.keys()):
             raise ValueError("Provided logical operators must be split into \"X\" and \"Z\" types.")
@@ -226,11 +227,41 @@ class StabilizerCode:
 
 
 class SurfaceCode(StabilizerCode):
+    """
+    Class hosting the behaviour of a surface code.
+
+    Notes
+    -----
+    This class implements the behaviour of the unrotated surface code. Its default
+    constructors use the hexagonal embedding and the square lattice.
+
+    Examples
+    --------
+    >>> c = SurfaceCode.hex_code(3, 3)
+    >>> c.num_logical_qubits # Toric embedding
+    2
+    >>> c.num_stabilizers
+    27
+    >>> c.num_qubits
+    27
+
+    """
 
     @classmethod
     def hex_code(self, d1: int, d2: int) -> "SurfaceCode":
-        assert d1 > 1
-        assert d2 > 1
+        """
+        Builds a toric surface code with hexagonal geometry.
+
+        Parameters
+        ----------
+        d1: int
+            Size (distance) of the lattice in one direction.
+        d2: int
+            Size (distance) of the lattice in the other direction.
+
+        """
+        assert d1 > 1, "Distance must be larger than 1"
+        assert d2 > 1, "Distance must be larger than 1"
 
         # Qubits that are horizontally placed in horizontal or vertical position
         horiz = [[] for _ in range(d2)]
@@ -278,12 +309,20 @@ class SurfaceCode(StabilizerCode):
                                            (list(range(len(stabx), len(stabx) + len(stabz) - 1)), [len(stabx) + len(stabz) - 1])])
 
     @classmethod
-    def toric_code(cls, d1, d2):
+    def toric_code(cls, d1: int, d2: int) -> "SurfaceCode":
         """
-        Square lattice toric code
+        Builds a toric surface code over a square lattice.
+
+        Parameters
+        ----------
+        d1: int
+            Size of the lattice in the horizontal direction.
+        d2: int
+            Size of the lattice in the vertical direction.
+
         """
-        assert d1 > 1
-        assert d2 > 1
+        assert d1 > 1, "Distance must be larger than 1"
+        assert d2 > 1, "Distance must be larger than 1"
 
         # Qubits that are vertical or horizontal in the drawing
         verts = [[] for _ in range(d2)]
@@ -322,9 +361,25 @@ class SurfaceCode(StabilizerCode):
                                    (list(range(len(stabx), len(stabx) + len(stabz) - 1)), [len(stabx) + len(stabz) - 1])])
 
     @classmethod
-    def cylindrical_patch(cls, dx: int, dz: int, big_dx=None):
+    def cylindrical_patch(cls, dx: int, dz: int, big_dx=None) -> "SurfaceCode":
         """
-        Cylindrical fraction of a toric code
+        Builds a cylindrical patch of surface code (a toric code with two parallel boundaries).
+        Use a square lattice.
+
+        Notes
+        -----
+        This can be seen as a toric code with an open boundary,
+        or a square patch closed on itself.
+
+        Parameters
+        ----------
+        dx: int
+            Distance of the X observable.
+        dz: int
+            Distance of the Z observable.
+        big_dx: int, optional
+            Larger distance considered before cutting the torus, for qubit index alignment purposes.
+
         """
         code = cls.toric_code(dx, dz)
         if big_dx is None:
@@ -369,16 +424,45 @@ class SurfaceCode(StabilizerCode):
         return SurfaceCode(code._stabilizers, code._logical_operators, code._qubits, code._stab_relations)
 
     def iter_stabilizers(self, kind=None):
+        """
+        Iterates over the stabilizers of this code. Can be filtered to only include stabilizers of a specific Pauli kind.
+
+        Parameters
+        ----------
+        kind: str, optional
+            Optional filter to only include the stabilizers of a specific Pauli kind. Can only be 'X' or 'Z'.
+
+        """
         if kind is None:
             return super().iter_stabilizers()
         else:
             return iter(self._stabilizers[kind])
 
-    def dehn_twist(self, guide, auxiliary=None, to_avoid={}, force_cnot=[], check=True):
+    def dehn_twist(self, guide, auxiliary=None, to_avoid={}, force_cnot=[], check=True) -> (list[int], list[tuple[int]], int):
         """
-        guide: A Z (non self-intersecting) logical operator of the code
-        auxiliary: One qubit within the Xoperator parallel to the guide,
-        indicating the side on which the twist is performed
+        Performs one step of a dehn twist procedure, modifying the object accordingly.
+
+        Parameters
+        ----------
+        guide: list[int]
+            The support of a Z non self-intersecting logical operator of the code.
+        auxiliary: int, optional
+            One qubit within the Xoperator parallel to the guide, indicating the side on which the twist is performed. Typically, left as None for the first step and then fed the auxiliary value output at the end of this first step.
+        to_avoid: set[int], optional
+            Legacy parameter, qubit indices that will be not be considered as support for the cnots. Do not use if you do are unsure.
+        force_cnot: list[tuple[int]], optional
+            List of precomputed CNOT gates to use for the dehn twist step. Use this to force a specific set of CNOT gate to be used.
+        check: bool, optional
+            Whether a sanity check of the consistency of the surface code is run at the end.
+
+        Returns
+        -------
+        list[int]
+            The support of the guide ordered in a convenient way.
+        list[tuple[int]]
+            List of CNOT gates applied during this step.
+        int
+            A possible auxiliary for subsequent dehn twist steps.
         """
         if check:
             assert self.is_logical_operator(PauliOperator.from_support(guide, "Z", len(self._qubits)))
