@@ -3,7 +3,7 @@ Driver for running a stim experiment for a stabilizer code.
 """
 
 from stabcodes.pauli import PauliOperator, Pauli
-from stabcodes.stabilizer_code import StabilizerCode, SurfaceCode
+from stabcodes.stabilizer_code import StabilizerCode
 from typing import Union, Iterable, Optional
 from itertools import count, product
 import sinter
@@ -504,7 +504,7 @@ class StimExperiment:
         """
         self._circuit += f"DEPOLARIZE2({rate}) " + " ".join(f"{qb[0]} {qb[1]}" for qb in supports) + "\n"
 
-    def get_task(self, decoder: Optional[sinter.Decoder] = None, pass_circuit: bool = False, **values):
+    def get_task(self, decoder: Optional[sinter.Decoder] = None, pass_circuit: bool = False, **values) -> (list[sinter.Task], dict[str, sinter.Decoder]):
         """
         Create a list of tasks from the different values for the variables of this circuit.
 
@@ -518,6 +518,13 @@ class StimExperiment:
         values: dict[str, list[object]]
             Name and list of possible values for the declared variables used by this experiment.
             A cartesian product of the different values is considered for creating all the possible tasks.
+
+        Returns
+        -------
+        list[sinter.Task]
+            A list of sinter tasks that can be simulated.
+        dict[str, sinter.Decoder]
+            A mapping of unique decoder names to instantied decoders to give to a sinter.collect() call.
 
         """
         ordered_keys = values.keys()
