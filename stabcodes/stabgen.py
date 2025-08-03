@@ -24,7 +24,7 @@ class StabGen(RecursiveMapping):
     Notes
     -----
     As the labels are lexicographically comparable, the stabilizers are always iterated
-    over in the same order, as long as no label changes and no elements is added.
+    over in the same order, as long as no label change and no element is added.
 
     Examples
     --------
