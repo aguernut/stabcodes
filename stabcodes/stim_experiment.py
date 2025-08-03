@@ -1,17 +1,45 @@
 """
-
+Driver for running a stim experiment for a stabilizer code.
 """
 
 from stabcodes.pauli import PauliOperator, Pauli
-from itertools import count, product, repeat
+from stabcodes.stabilizer_code import StabilizerCode, SurfaceCode
+from typing import Union, Iterable, Optional
+from itertools import count, product
 import sinter
 import stim
 import uuid
 
 
 class MeasureClock:
+    """
+    Basic counter class to track the clock state of the quantum processor.
+    This clock should incremented everytime a stim measurement is performed.
+
+    Attributes
+    ----------
+    current: int
+        The current time of the clock.
+
+    Notes
+    -----
+    This is the under the hood implementation that guarantees coherent measurement in
+    the :class:`StimExperiment` class.
+
+    Examples
+    --------
+    >>> clock = MeasureClock()
+    >>> index = next(clock)
+    >>> index == clock.current == 0
+    True
+    >>> index = next(clock)
+    >>> index == clock.current == 1
+    True
+
+    """
 
     def __init__(self):
+        """Initiates a clock."""
         self._clock = count()
         self._current = 0
 
@@ -21,12 +49,31 @@ class MeasureClock:
 
     @property
     def current(self):
+        """Current time of the clock."""
         return self._current
 
 
 class Variable:
-
+    """
+    Placeholder for numerical values to be decided later.
+    This relies on f-string and the format function.
+    """
     def __init__(self, name):
+        """
+        Instantiate a new variable.
+
+        Notes
+        -----
+        Variables are identified by their name (similarly to a programming variable).
+        Creating two Variables with the same name will create two independent objects,
+        but they will be indistinguishable in their standard use.
+
+        Parameters
+        ----------
+        name: str
+            A name that will be used as an f-string identifier.
+
+        """
         self._name = name
 
     def __str__(self):
@@ -37,6 +84,28 @@ class Variable:
 
 
 class StimExperiment:
+    """
+    A high-level class handling a stim experiment.
+
+    Notes
+    -----
+    Some of the advanced method of this class where created for some
+    surface code experiments. You will probably have to create your
+    own methods if you want to simulate other codes, especially if
+    you need specific annotations for your targeted decoder.
+
+    Notes
+    -----
+    This class does not allow for circuit-level measurement of stabilizers.
+    You will have to devise a method doing that and call it instead of
+    :meth:`measure_refined_phenom`.
+
+    Attributes
+    ----------
+    circuit: string
+        F-string representing the current state of the underlying stim circuit.
+
+    """
 
     def __init__(self):
         self._circuit = ""
@@ -47,7 +116,29 @@ class StimExperiment:
         self._physical_measurement = None
         self._Bell_physical_measurement = None
 
-    def startup(self, *codes, init_bases="Z", fidelity=0):
+    @property
+    def circuit(self):
+        """Current state of the underlying stim circuit."""
+        return self._circuit
+
+    def startup(self, *codes, init_bases="Z"):
+        """
+        Initialization of the experiment.
+
+        Notes
+        -----
+        Any tracked qubit must be part of a code.
+
+        Parameters
+        ----------
+        codes: StabilizerCode
+            Any number of stabilizer codes that takes part in the experiment.
+
+        init_bases: str
+            Basis in which the qubits of each code will initialized.
+            One basis per code must be specified, inside a common string (e.g. "ZZX").
+
+        """
         if len(init_bases) != len(codes):
             raise ValueError("An initialization basis for each code must be specified.")
 
@@ -55,7 +146,7 @@ class StimExperiment:
         self._physical_measurement = {}
         self._Bell_physical_measurement = {}
         self._codes = list(codes)
-        N = sum(c.num_qubits for c in codes) + fidelity
+        N = sum(c.num_qubits for c in codes)
         self._data_qubits = range(N)
         qb_shift = 0
         for c, init_basis in zip(codes, init_bases):
@@ -64,17 +155,40 @@ class StimExperiment:
             qb_shift += len(c.qubits)
             c._stabilizers.reset()
             c._logical_operators.reset()
-        self._circuit += f"R{init_basis} " + " ".join(str(i) for i in self._data_qubits) + "\n"
+            self._circuit += f"R{init_basis} " + " ".join(str(i) for i in c.qubits) + "\n"
 
-        return tuple(range(qb_shift, N)) if fidelity else None
+    def add_variables(self, newvar, value=None) -> object:
+        """
+        Defines a new variable for the experiment.
 
-    def add_variables(self, newvar, value=None):
+        Parameters
+        ----------
+        newvar: Variable
+            Variable to add to the context.
+        value: object, optional
+            Typically a default numerical value taken by the variable.
+
+        """
         return self._variables.setdefault(newvar, value)
 
-    def spacecode_projection(self):
-        raise NotImplementedError
-
     def measure_refined_phenom(self, *codes, meas_noise=0.0, project=None, detector_decoration=None):
+        """
+        Adds a round of stabilizer measurement for the specified codes.
+
+        Parameters
+        ----------
+        codes: StabilizerCode
+            Stabilizer codes whose stabilizers will be measured.
+        meas_noise: Union[Variable, float]
+            Measurement error rate, defaults to 0.0.
+        project: str, optional
+            If specified, the stabilizer whose kind ("X" or "Z") matches the parameter will be the only
+            one added to a detector. Typically, a first round of stabilizer measurement with qubit initialized
+            in the "Z" basis will use project="Z", and subsequent rounds will use None.
+        detector_decoration: str, optional
+            Some optional decoration added to the included detectors to help the decoder.
+
+        """
         if not codes:
             codes = self._codes
 
@@ -87,12 +201,39 @@ class StimExperiment:
                 elif project == "Z" and s.isZ or project == "X" and s.isX:
                     self._circuit += "DETECTOR" + (f"({detector_decoration}) " if detector_decoration else " ") + "rec[-1]\n"
 
-    def stim_measure_changing_support_text(self):
-        raise NotImplementedError
-
-    def buddy_measurement(self, code0, code1, mapping, mode, meas_noise="{meas_noise}", decoding_step0=1, decoding_step1=1):
+    def buddy_measurement(self, code0: StabilizerCode, code1: StabilizerCode,
+                          mapping: dict[int, int], mode: dict[int, dict[str, str]],
+                          meas_noise: Union[Variable, float] = "{meas_noise}",
+                          decoding_step0: int = 1, decoding_step1: int = 1):
         """
-        Patch must be in code1
+        Intricate function ensuring that the detectors are properly set after a round of entangling transversal gates.
+        Each stabilizer from one code will be associated to a "buddy" stabilizer from the other code with which it has
+        been entangled. If a patch is involved, it must be set as a "code1" parameter.
+
+        Detectors are annotated to accomodate the two-step MWPM decoder.
+
+        Notes
+        -----
+        This function is only useful for CSS codes.
+
+        Parameters
+        ----------
+        code0: StabilizerCode
+            Stabilizer code of reference
+        code1: StabilizerCode
+            Subordinate stabilizer code. It is advised to put any patch with boundaries as this parameter
+        mapping: dict[int, int]
+            An injective mapping of the qubits from code0 to code1.
+        mode: dict[int, dict[str, str]]
+            Small dictionary describing which kind of stabilizers are grown from which code.
+            For example, if the entangling gates are CNOT gates, the mode is the following:
+            {0: {"X": "X", "Z": ""}, 1: {"X": "", "Z": "Z"}}
+        meas_noise: Union[Variable, float]
+            Measurement error rate, defaults to 0.0.
+        decoding_step0: int
+            Decoration for the detectors associated with code0.
+        decoding_step1: int
+            Decoration for the detectors associated with code1.
         """
         # Buddies computation
 
@@ -151,22 +292,61 @@ class StimExperiment:
                     for buddy in buddies:
                         self._circuit += f"DETECTOR({decoding_step1}) rec[-1] rec[{stab.last_measure_time[-2] - stab.last_measure_time[-1] - 1}] rec[{(v if (v := buddy.last_measure_time[-1]) < deb else buddy.last_measure_time[-2]) - stab.last_measure_time[-1] - 1}]\n"
 
-    def observable_measurement(self, index: int, operator: PauliOperator, obs_meas_noise=0.0):
+    def observable_measurement(self, index: int, operator: PauliOperator,
+                               obs_meas_noise: Union[Variable, float] = 0.0):
+        """
+        Measures given :class:`PauliOperator` and adds it to an observable.
+
+        Parameters
+        ----------
+        index: int
+            Index of the observable to which the measurement should be added.
+        operator: PauliOperator
+            Operator that should be measured.
+        obs_meas_noise: Union[Variable, float]
+            Measurement error rate of the operator, defaults to 0.0.
+
+        """
         operator.measure(self._measure_clock)
         self._circuit += f"MPP({obs_meas_noise}) " + "*".join(operator[i].kind + str(operator[i].qubit) for i in operator.support) + "\n"
         self._circuit += f"OBSERVABLE_INCLUDE({index}) rec[-1]\n"
 
-    def observable_Pauli_target(self, index: int, operator: PauliOperator):
-        self._circuit += f"OBSERVABLE_INCLUDE({index}) " + " ".join(operator[qb].kind + str(qb) for qb in operator.support) + "\n"
+    def destructive_measurement(self, basis: str, to_measure: Optional[Iterable[int]] = None):
+        """
+        Performs a physical measurement of all the (specified) qubits.
 
-    def destructive_measurement(self, basis, to_measure=None):
+        Parameters
+        ----------
+        basis: str
+            Basis in which the physical qubits are measured. Can be "X", "Y" or "Z".
+        to_measure: Iterable[int], optional
+            Collection of qubits to be measured. If None is provided, all the qubits in the current context will be measured.
+
+        """
         if to_measure is None:
             to_measure = self._data_qubits
         self._circuit += f"M{basis} " + " ".join(str(i) for i in to_measure) + "\n"
         for i in to_measure:
             self._physical_measurement[i] = (basis, next(self._measure_clock))
 
-    def reconstruct_stabilizers(self, *codes, detector_decoration=None):
+    def reconstruct_stabilizers(self, *codes: StabilizerCode, detector_decoration: Optional[int] = None):
+        """
+        Reconstructs stabilizer measurements from the last physical measurement of the qubits.
+
+        Parameters
+        ----------
+        codes: StabilizerCode
+            Codes whose stabilizers will be reconstructed. Only the stabilizer whose expression matches
+            the last physical measurement will be reconstructed, others will be silently ignored.
+        detector_decoration: int, optional
+            Optional decoration for the added detectors. Can be useful for the decoder.
+
+        Notes
+        -----
+        The last available measurement of the correct kind will be used, even if some other operations
+        happened in-between. Make sure to properly perform a destructive measurement before.
+
+        """
         current = self._measure_clock.current
         if not codes:
             codes = self._codes
@@ -180,7 +360,28 @@ class StimExperiment:
                 else:
                     self._circuit += "DETECTOR" + (f"({detector_decoration}) " if detector_decoration else " ") + " ".join(f"rec[{self._physical_measurement[qb][1] - current - 1}]" for qb in s.support) + f" rec[{s.last_measure_time[-1] - current - 1}]\n"
 
-    def reconstruct_observable(self, index, operator):
+    def reconstruct_observable(self, index: int, operator: PauliOperator):
+        """
+        Reconstructs observable measurements from the last physical measurement of the qubits.
+
+        Parameters
+        ----------
+        index: int
+            Index of the observable to which the reconstructed value should be added.
+        operator: PauliOperator
+            Operator whose measurement will be added to the observable.
+
+        Raises
+        ------
+        RuntimeError
+            Raised when a requirement measurement has not been done, or was performed in an incorrect basis.
+
+        Notes
+        -----
+        The last available measurement of the correct kind will be used, even if some other operations
+        happened in-between. Make sure to properly perform a destructive measurement before.
+
+        """
         current = self._measure_clock.current
         for qb in operator.support:
             (basis, meas_time) = self._physical_measurement.get(qb, (None, None))
@@ -191,17 +392,44 @@ class StimExperiment:
 
         self._circuit += f"OBSERVABLE_INCLUDE({index}) " + " ".join(f"rec[{self._physical_measurement[qb][1] - current - 1}]" for qb in operator.support) + "\n"
 
-    def destructive_measurement_Bell(self, to_measure1, to_measure2, basis, basis2=None):
+    def destructive_measurement_Bell(self, to_measure1: list[int], to_measure2: list[int], basis: str, basis2: Optional[str] = None):
+        """
+        Performs a physical Bell measurement of some physical qubits.
+
+        Parameters
+        ----------
+        to_measure1: list[int]
+            First half of the qubits to measure.
+        to_measure1: list[int]
+            Second half of the qubits to measure.
+        basis: str
+            Basis in which the qubit of the first half are measured.
+        basis2: str, optional
+            Basis in which the qubit of the second half are measured. If None, the same basis as the first half is used.
+        """
         assert len(to_measure1) == len(to_measure2)
 
         if basis2 is None:
             basis2 = basis
 
-        self._circuit += f"MPP " + " ".join(basis + str(i) + "*" + basis2 + str(j) for i, j in zip(to_measure1, to_measure2)) + "\n"
+        self._circuit += "MPP " + " ".join(basis + str(i) + "*" + basis2 + str(j) for i, j in zip(to_measure1, to_measure2)) + "\n"
         for i, j in zip(to_measure1, to_measure2):
             self._Bell_physical_measurement[Pauli(basis, i)] = (Pauli(basis2, j), next(self._measure_clock))
 
-    def reconstruct_stabilizers_Bell(self, code1, code2, detector_decoration=None):
+    def reconstruct_stabilizers_Bell(self, code1: StabilizerCode, code2: StabilizerCode, detector_decoration: Optional[int] = None):
+        """
+        Reconstructs stabilizer Bell measurements from the last physical Bell measurement of the qubits.
+
+        Parameters
+        ----------
+        code1: StabilizerCode
+            First code from which to take the stabilizers.
+        code2: StabilizerCode
+            Second code from which to take the stabilizers.
+        detector_decoration: int, optional
+            Optional decoration for the added detectors. Can be useful for the decoder.
+
+        """
         current = self._measure_clock.current
 
         for s1, s2 in zip(code1.stabilizers, code2.stabilizers):
@@ -212,7 +440,30 @@ class StimExperiment:
                     raise RuntimeError(f"No Bell measurement with {pauli} as primary target have secondary target in {supp2}.")
             self._circuit += "DETECTOR" + (f"({detector_decoration}) " if detector_decoration else " ") + " ".join(f"rec[{self._Bell_physical_measurement[pauli][1] - current - 1}]" for pauli in supp1) + f" rec[{s1.last_measure_time[-1] - current - 1}]" + f" rec[{s2.last_measure_time[-1] - current - 1}]\n"
 
-    def reconstruct_observable_Bell(self, observable1, observable2, index=None):
+    def reconstruct_observable_Bell(self, observable1: PauliOperator, observable2: PauliOperator, index: int):
+        """
+        Reconstructs observable Bell measurements from the last physical Bell measurement of the qubits.
+
+        Parameters
+        ----------
+        observable1: PauliOperator
+            First operator whose measurement will be added to the observable.
+        observable2: PauliOperator
+            Second operator whose measurement will be added to the observable.
+        index: int
+            Index of the observable to which the reconstructed measurement will be added.
+
+        Raises
+        ------
+        RuntimeError
+            Raised when a requirement measurement has not been done, or was performed in an incorrect basis.
+
+        Notes
+        -----
+        The last available measurement of the correct kind will be used, even if some other operations
+        happened in-between. Make sure to properly perform a destructive measurement before.
+
+        """
         current = self._measure_clock.current
         supp1 = {observable1[qb] for qb in observable1.support}
         supp2 = {observable2[qb] for qb in observable2.support}
@@ -221,50 +472,54 @@ class StimExperiment:
                 raise RuntimeError(f"No Bell measurement happened with {pauli} as primary target")
         self._circuit += f"OBSERVABLE_INCLUDE({index}) " + " ".join(f"rec[{self._Bell_physical_measurement[pauli][1] - current - 1}]" for pauli in supp1) + "\n"
 
-    # def destructive_measurement_fidelity(self, basis, fidelity, to_measure=None):
-    #     if to_measure is None:
-    #         to_measure = self._data_qubits
-    # 
-    #     self._circuit += "MPP " + " ".join(f"{basis}{fidelity}*{basis}{str(qb)}" for qb in to_measure) + "\n"
-    #     for i in to_measure:
-    #         self._Bell_physical_measurement[(basis, i)] = next(self._measure_clock)
-    # 
-    # def reconstruct_stabilizers_fidelity(self, *codes, detector_decoration=None):
-    #     current = self._measure_clock.current
-    #     if not codes:
-    #         codes = self._codes
-    # 
-    #     for c in codes:
-    #         for s in c.stabilizers:
-    #             for qb in s.support:
-    #                 meas_time = self._Bell_physical_measurement.get((s[qb].kind, qb), None)
-    #                 if meas_time is None:
-    #                     raise ValueError("Qubit {qb} hasn't been measured in the basis {s[qb].kind}")
-    #             else:
-    #                 self._circuit += "DETECTOR" + (f"({detector_decoration}) " if detector_decoration else " ") + " ".join(f"rec[{self._Bell_physical_measurement[s[qb].kind, qb] - current - 1}]" for qb in s.support) + f" rec[{s.last_measure_time[-1] - current - 1}]\n"
-    # 
-    # def reconstruct_observable_fidelity(self, index, operator):
-    #     current = self._measure_clock.current
-    #     for qb in operator.support:
-    #         meas_time = self._Bell_physical_measurement.get((operator[qb].kind, qb), None)
-    #         if meas_time is None:
-    #             raise RuntimeError(f"Qubit {qb} as not been physically measured yet in basis {operator[qb].kind}.")
-    # 
-    #     self._circuit += f"OBSERVABLE_INCLUDE({index}) " + " ".join(f"rec[{self._Bell_physical_measurement[operator[qb].kind, qb] - current - 1}]" for qb in operator.support) + "\n"
+    def depolarize1(self, rate: Union[Variable, float], support: Optional[list[int]] = None):
+        """
+        Transversal depolarizing noise over the individual physical qubits.
 
-    def depolarize1(self, rate, support=None):
+        Parameters
+        ----------
+        rate: Union[Variable, float]
+            Depolarizing error rate.
+        support: list[int], optional
+            Qubits that will undergo the depolarizing channel.
+            If None is provided, all the qubits in context will be depolarized.
+
+        """
         if support is None:
             support = self._data_qubits
 
         self._circuit += f"DEPOLARIZE1({rate}) " + " ".join(str(i) for i in support) + "\n"
 
-    def depolarize2(self, rate, supports):
+    def depolarize2(self, rate: Union[Variable, float], supports: list[tuple[int, int]]):
+        """
+        Correlated depolarizing noise over pairs of physical qubits.
+
+        Parameters
+        ----------
+        rate: Union[Variable, float]
+            Depolarizing error rate.
+        supports: list[tuple[int, int]]
+            Pairs across which the correlated depolarizing noise occurs.
+
+        """
         self._circuit += f"DEPOLARIZE2({rate}) " + " ".join(f"{qb[0]} {qb[1]}" for qb in supports) + "\n"
 
-    def stim_x_error_text(self):
-        raise NotImplementedError
+    def get_task(self, decoder: Optional[sinter.Decoder] = None, pass_circuit: bool = False, **values):
+        """
+        Create a list of tasks from the different values for the variables of this circuit.
 
-    def get_task(self, decoder=None, pass_circuit=False, decoder_options=dict(), **values):
+        Parameters
+        ----------
+        decoder: sinter.Decoder, optional
+            Decoder to be used to decode this task. It is an optional argument as built-in decoders can also be passed
+            when calling sinter.collect().
+        pass_circuit: bool
+            Whether the circuit must be passed to the instantiated decoder.
+        values: dict[str, list[object]]
+            Name and list of possible values for the declared variables used by this experiment.
+            A cartesian product of the different values is considered for creating all the possible tasks.
+
+        """
         ordered_keys = values.keys()
         assert set(var._name for var in self._variables.keys()) <= set(ordered_keys), f"All declared variables must be assigned, {set(self._variables.keys()) - set(ordered_keys)} not set"
 
@@ -286,7 +541,18 @@ class StimExperiment:
 
         return tasks, decoder_names
 
-    def apply_gate(self, gate, support):
+    def apply_gate(self, gate: str, support: Union[list[int], list[tuple[int]]]):
+        """
+        Applies a specific gate to a list of targeted qubits.
+
+        Parameters
+        ----------
+        gate: str
+            Gate to apply. Must a valid gate name understood by stim.
+        support: Union[list[int], list[tuple[int]]]
+            Indices of the qubits supporting the gate.
+
+        """
         if gate in {"CX", "CZ", "CY", "SWAP", "CNOT"}:
             self._circuit += f"{gate} " + " ".join(" ".join(str(qb) for qb in pairs) for pairs in support) + "\n"
         else:
@@ -294,54 +560,5 @@ class StimExperiment:
 
 
 if __name__ == "__main__":
-    from stabcodes.stabilizer_code import SurfaceCode
-    import uuid
-    from stabcodes.visualization import dump_to_csv, plot_error_rate
-    from datetime import date
-
-    def SurfaceMemory(distance):
-        code = SurfaceCode.toric_code(distance, distance)
-        exp = StimExperiment()
-        noise = Variable("noise")
-        exp.add_variables(noise)
-        exp.startup(code, init_bases="Z")
-        exp.measure_refined_phenom(code, meas_noise=noise, project="Z")
-
-        for i, log in enumerate(code.logical_operators["Z"]):
-            exp.observable_measurement(i, log, 0.0)
-
-        for _ in range(distance):
-            exp.measure_refined_phenom(code, meas_noise=noise)
-            exp.depolarize1(noise)
-
-        exp.destructive_measurement("Z")
-        exp.reconstruct_stabilizers()
-        for i, log in enumerate(code.logical_operators["Z"]):
-            exp.reconstruct_observable(i, log)
-
-        return exp
-
-    tasks = []
-
-    for distance in range(3, 12, 2):
-        exp = SurfaceMemory(distance)
-        tasks.extend(exp.get_task(d=[distance],
-                                  noise=[0.035 * ((0.045 / 0.035)**(i / 20)) for i in range(21)]))
-    custom_decoders = dict(task.decoder for task in tasks)
-    del custom_decoders[None]
-    print(custom_decoders)
-    for task in tasks:
-        task.decoder = task.decoder[0]
-    code_stats = sinter.collect(
-        num_workers=11,
-        tasks=tasks,
-        decoders=["pymatching"],
-        max_shots=1_000,
-        print_progress=True,
-        # separated = True
-    )
-
-    namefile = "result_memory_" + date.today().isoformat() + str(uuid.uuid1())
-    dump_to_csv(code_stats, namefile)
-
-    plot_error_rate(namefile)
+    import doctest
+    doctest.testmod(optionflags=doctest.ELLIPSIS)
