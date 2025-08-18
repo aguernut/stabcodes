@@ -34,8 +34,8 @@ class StabilizerCode:
     >>> code.check()  # Are the commutation relations correct ?
 
     """
-    def __init__(self, stabilizers: Union[Sequence[Stabilizer], Mapping[str, Stabilizer]],
-                 logical_operators: Mapping[str, PauliOperator],
+    def __init__(self, stabilizers: Union[Sequence[Stabilizer], Mapping[str, Sequence[Stabilizer]]],
+                 logical_operators: Mapping[str, Sequence[PauliOperator]],
                  qubits: range,
                  stab_relations: Optional[list[tuple[list[int], list[int]]]] = None,
                  no_check: bool = False):
@@ -91,9 +91,9 @@ class StabilizerCode:
             extend_to = self._qubits.stop
         m = extend_to - self._qubits.stop
 
-        self._stabilizers.extend(m)
+        self._stabilizers.extend_qubits(m)
         self._stabilizers.itranslate(n=n)
-        self._logical_operators.extend(m)
+        self._logical_operators.extend_qubits(m)
         self._logical_operators.itranslate(n=n)
 
     def copy(self) -> "StabilizerCode":
@@ -179,9 +179,9 @@ class StabilizerCode:
             pass
 
         for relation in self._stab_relations:
-            assert prod((self._stabilizers[i] for i in relation[0]),
+            assert prod((self._stabilizers[i] for i in relation[0]), # type: ignore
                         start=PauliOperator(nb_qubits=len(self._qubits))) == \
-                prod((self._stabilizers[i] for i in relation[1]),
+                prod((self._stabilizers[i] for i in relation[1]), # type: ignore
                      start=PauliOperator(nb_qubits=len(self._qubits))), \
                 "Stabilizer relations do not check out"
 
@@ -248,7 +248,7 @@ class SurfaceCode(StabilizerCode):
     """
 
     @classmethod
-    def hex_code(self, d1: int, d2: int) -> "SurfaceCode":
+    def hex_code(cls, d1: int, d2: int) -> "SurfaceCode":
         """
         Builds a toric surface code with hexagonal geometry.
 
@@ -395,7 +395,7 @@ class SurfaceCode(StabilizerCode):
             for i in (dx * dz + i * dx for i in range(dz)):
                 stab[i] = I(i)
             foo = stab.support_as_set
-            stab.order = [i for i in stab.order if i in foo]
+            stab.order = [i for i in stab.order if i in foo] # type: ignore
 
         N = 2 * dx * dz
         newN = 2 * big_dx * dz
@@ -403,7 +403,7 @@ class SurfaceCode(StabilizerCode):
 
         code._qubits = range(newN)
 
-        code._stabilizers.extend(newN - N)
+        code._stabilizers.extend_qubits(newN - N)
         code._stabilizers.itranslate(mapping=mapping)
 
         s = set(mapping.values()) - set((big_dx * dz + i * big_dx for i in range(dz)))
@@ -413,10 +413,10 @@ class SurfaceCode(StabilizerCode):
                 continue
             code.stabilizers["Z"].append(Stabilizer2D([Z(j)], len(code._qubits)))
 
-        code._logical_operators["X"] = code._logical_operators["X"][:1]
-        code._logical_operators["Z"] = code._logical_operators["Z"][:1]
+        code._logical_operators["X"] = code._logical_operators["X"][:1] # type: ignore
+        code._logical_operators["Z"] = code._logical_operators["Z"][:1] # type: ignore
 
-        code._logical_operators.extend(newN - N)
+        code._logical_operators.extend_qubits(newN - N)
         code._logical_operators.itranslate(mapping=mapping)
 
         code._stab_relations = [(list(range(len(code.stabilizers["X"]) - 1)), [len(code.stabilizers["X"]) - 1])]
@@ -438,7 +438,7 @@ class SurfaceCode(StabilizerCode):
         else:
             return iter(self._stabilizers[kind])
 
-    def dehn_twist(self, guide, auxiliary=None, to_avoid={}, force_cnot=[], check=True) -> (list[int], list[tuple[int]], int):
+    def dehn_twist(self, guide, auxiliary=None, to_avoid={}, force_cnot=[], check=True) -> tuple[list[int], list[tuple[int]], Optional[int]]:
         """
         Performs one step of a dehn twist procedure, modifying the object accordingly.
 
@@ -478,7 +478,7 @@ class SurfaceCode(StabilizerCode):
 
         for stabx in self.stabilizers["X"]:
             for cnot in CNOTs:
-                stabx.apply_CNOT_with_caution(*cnot)
+                stabx.apply_CNOT_with_caution(*cnot) # type:ignore
 
         # Orders in Stabilizers touched by CNOTs need to be manually updated
         # Only those whose support changed need update.
@@ -487,7 +487,7 @@ class SurfaceCode(StabilizerCode):
         for stabz in self.stabilizers["Z"]:
             to_add = False
             for cnot in CNOTs:
-                if stabz.apply_CNOT_with_caution(*cnot):
+                if stabz.apply_CNOT_with_caution(*cnot): # type:ignore
                     to_add = True
             if to_add:
                 faces_other_kind.add(stabz)
@@ -528,20 +528,20 @@ class SurfaceCode(StabilizerCode):
 
         if auxiliary is None:
             stab = pairs[0]
-            while stab.order[0] not in guide_as_set or stab.order[1] in guide_as_set:
-                rotate_left(stab.order)
-            for qb in stab.order[1:]:
+            while stab.order[0] not in guide_as_set or stab.order[1] in guide_as_set: # type:ignore
+                rotate_left(stab.order) # type:ignore
+            for qb in stab.order[1:]: # type:ignore
                 if qb in to_avoid:
-                    rotate_left(stab.order)
-                    while stab.order[0] not in guide_as_set or stab.order[1] in guide_as_set:
-                        rotate_left(stab.order)
-                    for qb in stab.order[1:]:
+                    rotate_left(stab.order) # type:ignore
+                    while stab.order[0] not in guide_as_set or stab.order[1] in guide_as_set: # type:ignore
+                        rotate_left(stab.order) # type:ignore
+                    for qb in stab.order[1:]: # type:ignore
                         if qb in guide_as_set:
-                            auxiliary = stab.order[1]
+                            auxiliary = stab.order[1] # type:ignore
                             break
 
                 if qb in guide_as_set:
-                    auxiliary = stab.order[1]
+                    auxiliary = stab.order[1] # type:ignore
                     break
 
         if auxiliary is None:
@@ -555,14 +555,14 @@ class SurfaceCode(StabilizerCode):
             if auxiliary in stab.support:
                 # Rotate the view of the traversed stabilizers
                 # To place the next qubit of the guide in first place
-                rotate_to_place_first(stab.order, auxiliary)
-                while stab.order[0] not in guide:
-                    stab.order[:0], stab.order[1:] = stab.order[-1:], stab.order[:-1]
-                first_target = stab.order[0]
+                rotate_to_place_first(stab.order, auxiliary) # type:ignore
+                while stab.order[0] not in guide: # type:ignore
+                    stab.order[:0], stab.order[1:] = stab.order[-1:], stab.order[:-1] # type:ignore
+                first_target = stab.order[0] # type:ignore
 
                 # The next target is the other qubit also present in the guide
                 next_target = next(dropwhile(lambda x: x not in guide,
-                                             stab.order[1:]))
+                                             stab.order[1:])) # type:ignore
                 ordered_guide.append(first_target)
                 processed.add(stab)
                 ordered_pairs.append(stab)
@@ -580,11 +580,11 @@ class SurfaceCode(StabilizerCode):
                 if next_target in stab.support:
                     # Rotate the view of the traversed stabilizers
                     # To place the next qubit of the guide in first place
-                    rotate_to_place_first(stab.order, next_target)
+                    rotate_to_place_first(stab.order, next_target) # type:ignore
                     ordered_guide.append(next_target)
 
                     # The next target is the other qubit also present in the guide
-                    next_target = next(dropwhile(lambda x: x not in guide, stab.order[1:]))
+                    next_target = next(dropwhile(lambda x: x not in guide, stab.order[1:])) # type:ignore
                     processed.add(stab)
                     ordered_pairs.append(stab)
                     break
@@ -881,11 +881,11 @@ if __name__ == "__main__":
     import doctest
     doctest.testmod(optionflags=doctest.ELLIPSIS)
 
-    stabs = [PauliOperator.from_str("+IXZZXI"),
-             PauliOperator.from_str("+XZZXII"),
-             PauliOperator.from_str("+ZZXIXI"),
-             PauliOperator.from_str("+ZXIXZI"),
-             PauliOperator.from_str("+XIXZZI")]
+    stabs: list[Stabilizer] = [Stabilizer.from_str("+IXZZXI"),
+                               Stabilizer.from_str("+XZZXII"),
+                               Stabilizer.from_str("+ZZXIXI"),
+                               Stabilizer.from_str("+ZXIXZI"),
+                               Stabilizer.from_str("+XIXZZI")]
 
     log = {"X": [PauliOperator.from_str("+XXXXXI"), PauliOperator.from_str("+IIIIIX")],
            "Z": [PauliOperator.from_str("+ZZZZZI"), PauliOperator.from_str("+IIIIIZ")]}

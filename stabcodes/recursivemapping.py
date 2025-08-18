@@ -126,7 +126,7 @@ class RecursiveMapping(MutableMapping, MutableSequence):
             raise IndexError(f"{type(self).__name__} is empty")
 
         if len(self._type) == 1:
-            if not isinstance(index, int):
+            if not isinstance(index, int) and not isinstance(index, slice):
                 raise IndexError(f"Final index {index} must be of type int, not {type(index).__name__}.")
             return self._container[index]
 

@@ -2,7 +2,7 @@
 Implements Pauli matrix and Pauli operator logic.
 """
 
-from typing import Optional, Iterator, Union
+from typing import Optional, Iterator, Union, Self
 import numpy as np
 from numpy.typing import NDArray
 from itertools import chain
@@ -849,7 +849,7 @@ class PauliOperator:
         return self
 
     @classmethod
-    def from_str(cls, strg: Union[str, "PauliOperator"], bigendian: bool = False) -> "PauliOperator":
+    def from_str(cls, strg: Union[str, "PauliOperator"], bigendian: bool = False) -> Self:
         """Constructor of PauliOperator using a string under a Qiskit little endian format.
 
         Parameters
@@ -1423,7 +1423,7 @@ class Stabilizer2D(Stabilizer):
             self.order = []
 
     @classmethod
-    def from_str(cls, strg: Union[str, "PauliOperator"], bigendian: bool = False, order: Optional[list[int]] = None) -> "PauliOperator":
+    def from_str(cls, strg: Union[str, "PauliOperator"], bigendian: bool = False, order: Optional[list[int]] = None) -> Self:
         """Constructor of :class:`Stabilizer2D` using a string under a Qiskit little endian format.
 
         Parameters

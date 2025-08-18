@@ -3,7 +3,7 @@ Specialization of the :class:`RecursiveMapping` data structure to hold stabilize
 The intent is to have the stabilizers accessible both through indexing or filtering their Pauli type or possibly their color.
 """
 
-from typing import Optional, Union, Self
+from typing import Optional, Union, Self, Iterator, Iterable
 from collections.abc import Sequence, Mapping
 from stabcodes.recursivemapping import RecursiveMapping
 from stabcodes.pauli import PauliOperator, Stabilizer, Stabilizer2D, X, Z
@@ -37,7 +37,7 @@ class StabGen(RecursiveMapping):
 
     """
 
-    def __init__(self, value: Optional[Union[Sequence[PauliOperator], Mapping[str, PauliOperator]]] = None):
+    def __init__(self, value: Optional[Union[Sequence[PauliOperator], Mapping[str, Union[Sequence, Mapping]]]] = None):
         """Builds a StabGen from a sequence or a possibly recursive uniform mapping, ending with sequences of :class:`Paulioperator`.
 
         Parameters
@@ -83,9 +83,17 @@ class StabGen(RecursiveMapping):
         """Number of qubits affected by the elements."""
         return self._nb_qubits
     
-    def __setitem__(self, index, value: PauliOperator, /, *, _bykey=True):
+    def __setitem__(self, index, value: Union[PauliOperator, list[PauliOperator]], /, *, _bykey=True):
         if not isinstance(value, PauliOperator):
-            raise TypeError(f"Value {value} is not a PauliOperator.")
+            if not isinstance(value, list):
+                raise TypeError(f"Value {value} is not a PauliOperator.")
+            for v in value:
+                if not isinstance(v, PauliOperator):
+                    raise TypeError(f"Value {v} is not a PauliOperator.")
+                if v.nb_qubits != self._nb_qubits:
+                    raise ValueError(f"Cannot add a PauliOperator over {v.nb_qubits} qubits in a {type(self).__name__} over {self._nb_qubits} qubits.")
+            return super().__setitem__(index, value, _bykey=_bykey)
+
         if value.nb_qubits != self._nb_qubits:
             raise ValueError(f"Cannot add a PauliOperator over {value.nb_qubits} qubits in a {type(self).__name__} over {self._nb_qubits} qubits.")
         return super().__setitem__(index, value, _bykey=_bykey)
@@ -270,14 +278,14 @@ class StabGen(RecursiveMapping):
         lambd[self._nb_qubits:, :self._nb_qubits] = np.eye(self.nb_qubits)
 
         return (self.to_matrix() @ lambd @ other.to_matrix().T) % 2
+    
+    def __iter__(self) -> Iterator[PauliOperator]:
+        return super().__iter__() # type: ignore
 
     def reset(self):
         """Resets the stored elements so that they can take part of a new simulation."""
         for s in self:
             s.reset() # type: ignore
-
-    def __repr__(self):
-        return type(self).__name__ + str(self.nb_qubits) + "(" + (repr(self._container) if len(self._type) == 1 else repr(dict(self.items()))) + ")"
 
     def extend_qubits(self, n: int):
         """Extends the domain of all the stored elements.
