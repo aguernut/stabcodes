@@ -78,10 +78,10 @@ _H_TABLEAU: dict[str, str] = {"I": "I",
                               "Y": "Y",
                               "Z": "X"}
 
-_COST: dict[str, float] = {"II": 0, "IX": 1, "IY": 1.5, "IZ": 1,
-                           "XI": 0, "XX": -1, "XY": 0, "XZ": 0.5,
-                           "YI": 0, "YX": -0.5, "YY": -1.5, "YZ": -0.5,
-                           "ZI": 0, "ZX": 0.5, "ZY": 0, "ZZ": -1}
+_COST: dict[str, int] = {"II": 0, "IX": 2, "IY": 3, "IZ": 2,
+                           "XI": 0, "XX": -2, "XY": 0, "XZ": 1,
+                           "YI": 0, "YX": -1, "YY": -3, "YZ": -1,
+                           "ZI": 0, "ZX": 1, "ZY": 0, "ZZ": -2}
 
 
 class Pauli:
@@ -322,7 +322,8 @@ class PauliOperator:
     ValueError: Cannot multiply two PauliOperators acting on different number of qubits (3 != 4).
     """
 
-    def __init__(self, paulis: Optional[list[Pauli]] = None, nb_qubits: int = 1, last_measure_time: Optional[list[Optional[int]]] = None):
+    def __init__(self, paulis: Optional[list[Pauli]] = None, nb_qubits: int = 1, 
+                 last_measure_time: Optional[list[Optional[int]]] = None):
         """Default constructor of the PauliOperator class.
 
         Parameters
@@ -403,7 +404,9 @@ class PauliOperator:
         >>> PauliOperator.from_support([1, 2], "X", 7)
         PauliOperator([X(1), X(2)], 7)
         """
-        func = X if kind == "X" else Z if kind == "Z" else Y if kind == "Y" else None
+        if kind not in ("X", "Y", "Z"):
+            raise ValueError(f"{kind} is not a valid Pauli kind.")
+        func = X if kind == "X" else Z if kind == "Z" else Y
         return cls([func(qb) for qb in support], nb_qubits)
 
     @property
@@ -417,7 +420,7 @@ class PauliOperator:
         return self.__nb_qubits
 
     @property
-    def last_measure_time(self) -> Optional[int]:
+    def last_measure_time(self) -> list[Optional[int]]:
         """Last time this operator was measured, if any.
 
         Must be updated through a call to the :meth:`~stabcodes.Pauli.PauliOperator.measure` method or the :meth:`~stabcodes.Pauli.PauliOperator.reset` method.
@@ -945,6 +948,8 @@ class PauliOperator:
             warnings.warn("Both parameter specified in call to translate, ignoring the n parameter", RuntimeWarning)
 
         if mapping is None:
+            if n is None:
+                raise ValueError("Either n or mapping parameters must be different from None.")
             paulis = [Pauli(p.kind, p.qubit + n) for p in self.paulis]
             return PauliOperator(paulis, self.nb_qubits + n)
 
@@ -1246,7 +1251,7 @@ class PauliOperator:
 
         """
 
-        self.__last_measure_time = [None]
+        self.__last_measure_time: list[Optional[int]] = [None]
 
 
 class Stabilizer(PauliOperator):
@@ -1510,7 +1515,9 @@ class Stabilizer2D(Stabilizer):
         >>> Stabilizer2D.from_support([1, 2], "X", 7)
         Stabilizer2D([X(1), X(2)], 7)
         """
-        func = X if kind == "X" else Z if kind == "Z" else Y if kind == "Y" else None
+        if kind not in ("X", "Y", "Z"):
+            raise ValueError(f"{kind} is not a valid Pauli kind.")
+        func = X if kind == "X" else Z if kind == "Z" else Y
         return cls([func(qb) for qb in support], nb_qubits)
 
     def apply_CNOT(self, control: int, target: int):
@@ -1825,7 +1832,7 @@ class Stabilizer2D(Stabilizer):
                             order=list(self.order),
                             last_measure_time=list(self.last_measure_time))
 
-    def translate(self, n: Optional[int] = None, mapping: Optional[dict[int, int]] = None, _m: int = 0) -> "Stabilizer2D":
+    def translate(self, mapping: Optional[dict[int, int]] = None, n: Optional[int] = None, _m: int = 0) -> "Stabilizer2D":
         """Returns a translated version of this stabilizer.
 
         A translation of the operator to another context, being it a
@@ -1869,6 +1876,8 @@ class Stabilizer2D(Stabilizer):
             warnings.warn("Both parameter specified in call to translate, ignoring the n parameter", RuntimeWarning)
 
         if mapping is None:
+            if n is None:
+                raise ValueError("Either n or mapping parameters must be different from None.")
             paulis = [Pauli(self.paulis[i].kind, self.paulis[i].qubit + n)
                       for i in self.order]
             return Stabilizer2D(paulis, self.nb_qubits + n - _m, order=[i + n for i in self.order])
@@ -1915,7 +1924,7 @@ class Stabilizer2D(Stabilizer):
         simplified.isimplify(available)
         return simplified
 
-    def isimplify(self, available: list[PauliOperator]):
+    def isimplify(self, available: list[PauliOperator]) -> "Stabilizer2D":
         """Simplifies this operator in-place.
 
         This function computes a simplified version of this operator
@@ -1959,6 +1968,7 @@ class Stabilizer2D(Stabilizer):
 
         self.__support = None
         self.__support_as_set = None
+        return self
 
     def apply_circuit(self, circuit: qiskit.QuantumCircuit, _override_safeguard: Optional[bool] = False):
         """Applies a :obj:`qiskit.circuit.QuantumCircuit` to the Pauli operator (by conjugation) :mod:`string`.
