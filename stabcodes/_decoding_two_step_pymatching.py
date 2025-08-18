@@ -14,7 +14,6 @@ from typing import Tuple
 
 from sinter._decoding._decoding_decoder_class import Decoder
 
-PRODUCE = False
 DEBUG = False
 
 
@@ -51,33 +50,8 @@ class TwoStepPymatching(Decoder):
             ignore_decomposition_failures=True,
         )
 
-        # if PRODUCE:
-        #     g = hgx.Hypergraph(weighted=True)
-        #     g.add_node(99999999)
-
         for inst in dem:
-            if PRODUCE:
-                for foo in split_around_all(inst.targets_copy()):
-                    bar = {i.val for i in foo[0]}
-                    if len(bar) == 1:
-                        a, = bar
-                        if inst.type != "error" and a in g.get_nodes():
-                            continue
-                        if (a, 99999999) not in g._edge_list:
-                            g.add_edge((a, 99999999), foo[1])
-                        continue
-
-                    if len(bar) == 2:
-                        a, b = bar
-                        if tuple(sorted((a, b))) not in g._edge_list:
-                            g.add_edge((a, b), foo[1])
-                        continue
-
-                    if len(bar) == 3:
-                        a, b, c = bar
-                        g.add_edge((a, b, c), foo[1])
-
-            for foo in split_around_separator(inst.targets_copy()):
+            for foo in split_around_separator(inst.targets_copy()): # type: ignore
                 bar = {i.val for i in foo}
                 if len(foo) == 1:
                     continue
@@ -107,26 +81,6 @@ class TwoStepPymatching(Decoder):
 
         G = detector_error_model_to_nx_graph2(dem, maps_id, filtered_detectors, filtered_detectors2)
         boundary_node = max(G)
-        # if PRODUCE:
-        #     # print(g._edge_list)
-        #     # gg = nx.Graph()
-        #     # for e in g._edge_list:
-        #     #     if len(e) == 2:
-        #     #         gg.add_edge(*e)
-        #     #     else:
-        #     #         gg.add_edge(e[0], e[1], multiedge=e[2])
-        #     #         gg.add_edge(e[2], e[1], multiedge=e[0])
-        #     #         gg.add_edge(e[0], e[2], multiedge=e[1])
-        #     # #print(gg.edges(data=True))
-        #     # nx.draw(gg, with_labels=True)
-        #     # plt.show()
-        #     import os
-        #     if f"incidence_{code.split('_')[-1]}.txt" not in os.listdir():
-        #         with open(f"incidence_{code.split('_')[-1]}.txt", "wb") as f:
-        #             g.binary_incidence_matrix().toarray().dump(f)
-        #
-        #         with open(f"obs_{code.split('_')[-1]}", "wb") as f:
-        #             pickle.dump(g._edge_list, f)
 
         G1 = G.copy()
         if DEBUG:
@@ -161,31 +115,13 @@ class TwoStepPymatching(Decoder):
 
         G2 = G.copy()
         G2.remove_nodes_from(filtered_detectors2)
-        # H = nx.Graph()
-        # for edge in g._edge_list:
-        #     H.add_edge(*edge[:2])
-        # nx.draw(G2, with_labels=True)
-        # plt.show()
 
         matching_graph1 = pymatching.Matching(G1)
         matching_graph2 = pymatching.Matching(G2)
         num_det_bytes = math.ceil(num_dets / 8)
 
-        # if PRODUCE:
-        #     from time import time
-        #     v = time()
-        #     with open(dets_b8_in_path, 'rb') as dets_in_f:
-        #         det_bytes = np.fromfile(dets_in_f, dtype=np.uint8)
-        #         with open(f"sample_{code}_{v}", "wb") as f:
-        #             det_bytes.tofile(f)
-        #
-        #     with open(obs_all_path, "rb") as obs_in_f:
-        #         obs_bytes = np.fromfile(obs_in_f, dtype=np.uint8)
-        #         with open(f"answer_{code}_{v}", "wb") as f:
-        #             obs_bytes.tofile(f)
-
         # note: extra 2 are the boundary node and the invincible-observable-boundary-edge node
-        det_bits_buffer = np.zeros(num_dets + 2, dtype=np.bool8)
+        det_bits_buffer = np.zeros(num_dets + 2, dtype=np.bool_)
         with open(dets_b8_in_path, 'rb') as dets_in_f:
             with open(obs_predictions_b8_out_path, 'wb') as obs_out_f:
                 for _ in range(num_shots):
@@ -228,8 +164,8 @@ class TwoStepPymatching(Decoder):
                         raise e
 
                     if len(second_prediction_bits[:num_obs]) < num_obs:
-                        second_prediction_bits = np.append(np.zeros(num_obs - len(second_prediction_bits[:num_obs]), dtype=int), second_prediction_bits[:num_obs])
-                    flipped_obs = (first_prediction_bits[:num_obs] + second_prediction_bits[:num_obs]) % 2
+                        second_prediction_bits = np.append(np.zeros(num_obs - len(second_prediction_bits[:num_obs]), dtype=int), second_prediction_bits[:num_obs]) # type:ignore
+                    flipped_obs = (first_prediction_bits[:num_obs] + second_prediction_bits[:num_obs]) % 2 # type:ignore
                     np.packbits(flipped_obs, bitorder='little').tofile(obs_out_f)
 
 
@@ -252,7 +188,7 @@ def iter_flatten_model(model: stim.DetectorErrorModel,
                         frames: List[int] = []
                         t: stim.DemTarget
                         p = instruction.args_copy()[0]
-                        for t in instruction.targets_copy():
+                        for t in instruction.targets_copy(): # type: ignore
                             if t.is_relative_detector_id():
                                 dets.append(t.val + det_offset)
                             elif t.is_logical_observable_id():
@@ -266,12 +202,12 @@ def iter_flatten_model(model: stim.DetectorErrorModel,
                         # Handle last component.
                         handle_error(p, dets, frames)
                     elif instruction.type == "shift_detectors":
-                        det_offset += instruction.targets_copy()[0]
+                        det_offset += instruction.targets_copy()[0] # type: ignore
                         a = np.array(instruction.args_copy())
                         coords_offset[:len(a)] += a
                     elif instruction.type == "detector":
                         a = np.array(instruction.args_copy())
-                        for t in instruction.targets_copy():
+                        for t in instruction.targets_copy(): # type:ignore
                             handle_detector_coords(t.val + det_offset, a + coords_offset[:len(a)])
                     elif instruction.type == "logical_observable":
                         pass
@@ -302,9 +238,9 @@ def detector_error_model_to_nx_graph2(model: stim.DetectorErrorModel, maps, filt
         if p == 0:
             return
 
-        dets = tuple(sorted(dets))
-        frame_changes = frame_changes + ([maps[dets]] if dets in maps and maps[dets] not in frame_changes else [])
-        # print(dets, frame_changes)
+        dets_as_tuple = tuple(sorted(dets))
+        frame_changes = frame_changes + ([maps[dets_as_tuple]] if dets_as_tuple in maps and maps[dets_as_tuple] not in frame_changes else [])
+
         if len(dets) == 0:
             # No symptoms for this error.
             # Code probably has distance 1.
