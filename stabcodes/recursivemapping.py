@@ -3,7 +3,7 @@ Implements a custom data structure midway between a :obj:`MutableMapping` and a 
 """
 
 
-from typing import Optional, Union
+from typing import Optional, Union, Any, Self
 from itertools import chain
 from copy import copy
 from collections.abc import MutableMapping, Mapping, Sequence, MutableSequence, Hashable
@@ -70,7 +70,7 @@ class RecursiveMapping(MutableMapping, MutableSequence):
             self._type = value._type
 
         elif isinstance(value, Sequence):
-            self._container = list(value)
+            self._container: Union[list[Any], dict[Hashable, Self]] = list(value)
             self._type = (int,)
 
         elif isinstance(value, Mapping):
@@ -91,7 +91,7 @@ class RecursiveMapping(MutableMapping, MutableSequence):
         else:
             raise TypeError(f"Expected a sequence or mapping, got {value} ({type(value).__name__}).")
 
-    def __getitem__(self, index: Hashable, /, *, _bykey=True):
+    def __getitem__(self, index: Union[Hashable, int], /, *, _bykey=True): # type: ignore
         """
         Custom special __getitem__ method, with a flag controlling the by key or by index access.
 
@@ -126,10 +126,14 @@ class RecursiveMapping(MutableMapping, MutableSequence):
             raise IndexError(f"{type(self).__name__} is empty")
 
         if len(self._type) == 1:
+            if not isinstance(index, int):
+                raise IndexError(f"Final index {index} must be of type int, not {type(index).__name__}.")
             return self._container[index]
 
         if _bykey and isinstance(index, self._type[0]):
-            return self._container[index]
+            if not isinstance(self._container, dict):
+                raise TypeError
+            return self._container.__getitem__(index)
 
         if not isinstance(index, int):
             raise TypeError(f"Expected type {self._type[0].__name__}{' or int' if self._type[0] != int else ''}, got {index} ({type(index).__name__}).")
@@ -167,7 +171,7 @@ class RecursiveMapping(MutableMapping, MutableSequence):
         """
         return self.__getitem__(index, _bykey=False)
 
-    def __setitem__(self, index, value, /, *, _bykey=True):
+    def __setitem__(self, index, value, /, *, _bykey=True): #type: ignore
         """
         Custom special __setitem__ method, with a flag controlling the by key or by index access.
 
@@ -222,7 +226,7 @@ class RecursiveMapping(MutableMapping, MutableSequence):
 
         raise IndexError(f"{type(self).__name__} index out of range ({index} >= {len(self)}).")
 
-    def __delitem__(self, index, /, *, _bykey=True):
+    def __delitem__(self, index, /, *, _bykey=True): #type: ignore
         """
         Custom special __delitem__ method, with a flag controlling the by key or by index access.
 
@@ -330,7 +334,7 @@ class RecursiveMapping(MutableMapping, MutableSequence):
         else:
             return sum(len(subobj) for subobj in self.values())
 
-    def keys(self):
+    def keys(self): #type: ignore
         """
         Iterator over the ordered top-level keys.
 
@@ -345,7 +349,7 @@ class RecursiveMapping(MutableMapping, MutableSequence):
             raise AttributeError(f"Base level of {type(self).__name__} has no keys.")
         return iter(k for (k, _) in self.items())
 
-    def values(self):
+    def values(self): #type: ignore
         """
         Iterator over the top-level values given in the same order as the ordered keys.
 
@@ -367,7 +371,8 @@ class RecursiveMapping(MutableMapping, MutableSequence):
         if len(self._type) == 1:
             return type(self)(list(self))
 
-        return type(self)({copy(k): copy(v) for k, v in self._container.items()})
+        # self._container should be dict
+        return type(self)({copy(k): copy(v) for k, v in self._container.items()}) # type: ignore
 
     def copy(self):
         """
@@ -386,7 +391,7 @@ class RecursiveMapping(MutableMapping, MutableSequence):
         """
         return self.__copy__()
 
-    def items(self):
+    def items(self): #type: ignore
         """
         Iterator over the top-level ordered given in the same order as the ordered keys.
 
@@ -399,7 +404,9 @@ class RecursiveMapping(MutableMapping, MutableSequence):
         """
         if len(self._type) == 1:
             raise AttributeError(f"Base level of {type(self).__name__} has no keys.")
-        return iter(sorted(self._container.items()))
+        
+        # self._container should be dict
+        return iter(sorted(self._container.items())) # type: ignore
 
     def popitem(self):
         """
@@ -432,7 +439,7 @@ class RecursiveMapping(MutableMapping, MutableSequence):
         del self[key]
         return key, value
 
-    def pop(self, *key, _bykey=True):
+    def pop(self, *key, _bykey=True): #type: ignore
         """
         Removes and returns the element of given key / index if provided, the last element if no argument is given.
 
@@ -464,10 +471,8 @@ class RecursiveMapping(MutableMapping, MutableSequence):
         RecursiveMapping({'Z': RecursiveMapping([]), 'z': RecursiveMapping([0, 1])})
 
         """
-        if not key:
-            key = len(self) - 1
-
-            return self.pop(key, _bykey=False)
+        if len(key) == 0:
+            return self.pop(len(self) - 1, _bykey=False)
 
         if len(key) > 1:
             raise TypeError(f"pop() takes at most one argument ({len(key)} given).")
@@ -496,7 +501,7 @@ class RecursiveMapping(MutableMapping, MutableSequence):
         """
         return any(value == v for v in self)
 
-    def update(self, other: "RecursiveMapping"):
+    def update(self, other: Self): #type: ignore
         """
         Recursively update the :obj:`RecursiveMapping` until the base level is reached.
         As the base-level elements are sequences, they are not updated by replaced when
@@ -537,7 +542,7 @@ class RecursiveMapping(MutableMapping, MutableSequence):
         if self._type != other._type:
             raise TypeError("Mismatching types between {type(self).__name__} objects.")
 
-        if len(self._type) == 1:
+        if not isinstance(self._container, dict) or len(self._type) == 1:
             raise AttributeError(f"Base level of {type(self).__name__} cannot be updated.")
 
         if len(self._type) > 2:
@@ -555,7 +560,7 @@ class RecursiveMapping(MutableMapping, MutableSequence):
 
         return self._type == other._type and self._container == other._container
 
-    def insert(self, *index):
+    def insert(self, *index): #type: ignore
         """
         Inserts a base-level value.
 
@@ -591,7 +596,7 @@ class RecursiveMapping(MutableMapping, MutableSequence):
         if len(self._type) == 0:
             raise TypeError(f"Cannot insert to an empty {type(self).__name__}.")
 
-        if len(self._type) == 1:
+        if isinstance(self._container, list):
             if len(index) == 1:
                 self._container.insert(index[0], value)
             else:
@@ -665,7 +670,7 @@ class RecursiveMapping(MutableMapping, MutableSequence):
             i += 1
         raise ValueError
 
-    def append(self, *index):
+    def append(self, *index): #type: ignore
         """
         Append a value as last element of the sequence.
         If keys are provided, the value will inserted as the last element of the
@@ -704,7 +709,7 @@ class RecursiveMapping(MutableMapping, MutableSequence):
         if len(self._type) == 0:
             raise TypeError(f"Cannot insert to an empty {type(self).__name__}.")
 
-        if len(self._type) == 1:
+        if isinstance(self._container, list) and len(self._type) == 1:
             if len(index) == 0:
                 self._container.append(value)
             else:
@@ -747,7 +752,7 @@ class RecursiveMapping(MutableMapping, MutableSequence):
         """
         self.__delitem__(self.index(value), _bykey=False)
 
-    def extend(self, *index):
+    def extend(self, *index): #type: ignore
         """
         Extends the subsequence pointed by optional indices by the last-given iterable.
 
@@ -785,7 +790,7 @@ class RecursiveMapping(MutableMapping, MutableSequence):
         if len(self._type) == 0:
             raise TypeError(f"Cannot insert to an empty {type(self).__name__}.")
 
-        if len(self._type) == 1:
+        if isinstance(self._container, list) and len(self._type) == 1:
             if len(index) == 0:
                 self._container.extend(value)
             else:
@@ -800,11 +805,14 @@ class RecursiveMapping(MutableMapping, MutableSequence):
     def __iadd__(self, values):
         if len(self._type) == 0:
             raise TypeError(f"Cannot insert to an empty {type(self).__name__}.")
+        
+        if isinstance(self._container, list):
+            self._container.extend(values)
 
         if len(self._type) > 1:
             raise AttributeError(f"Non base level of {type(self).__name__} cannot be summed. Use update() instead.")
 
-        self._container.extend(values)
+        
 
         return self
 
@@ -840,11 +848,11 @@ class RecursiveMapping(MutableMapping, MutableSequence):
         except TypeError:
             return default
 
-    setdefault = None
+    setdefault = None #type: ignore
 
-    __reversed__ = None
+    __reversed__ = None #type: ignore
 
-    reverse = None
+    reverse = None #type: ignore
 
 
 if __name__ == "__main__":
