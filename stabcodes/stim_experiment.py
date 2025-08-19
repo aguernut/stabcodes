@@ -3,8 +3,9 @@ Driver for running a stim experiment for a stabilizer code.
 """
 
 from stabcodes.pauli import PauliOperator, Pauli
-from stabcodes.stabilizer_code import StabilizerCode
-from typing import Union, Iterable, Optional
+from stabcodes.stabilizer_code import StabilizerCode, SurfaceCode
+from stabcodes.measure_clock import MeasureClock
+from typing import Union, Iterable, Optional, Literal
 from itertools import count, product
 import sinter
 import stim
@@ -66,20 +67,20 @@ class StimExperiment:
     """
 
     def __init__(self):
-        self._circuit = ""
-        self._variables = {}
-        self._measure_clock = None
-        self._codes = None
-        self._data_qubits = None
-        self._physical_measurement = None
-        self._Bell_physical_measurement = None
+        self._circuit: str = ""
+        self._variables: dict[str, Variable] = {}
+        self._measure_clock: MeasureClock = MeasureClock()
+        self._codes = []
+        self._data_qubits: range = range(0)
+        self._physical_measurement: dict[int, tuple[str, int]] = {}
+        self._Bell_physical_measurement: dict[Pauli, tuple[Pauli, int]] = {}
 
     @property
-    def circuit(self):
+    def circuit(self) -> str:
         """Current state of the underlying stim circuit."""
         return self._circuit
 
-    def startup(self, *codes, init_bases="Z"):
+    def startup(self, *codes: StabilizerCode, init_bases: str = "Z"):
         """
         Initialization of the experiment.
 
@@ -108,14 +109,13 @@ class StimExperiment:
         self._data_qubits = range(N)
         qb_shift = 0
         for c, init_basis in zip(codes, init_bases):
-            c._measure_count = self._measure_clock
             c.shift_qubits(qb_shift, N)
             qb_shift += len(c.qubits)
             c._stabilizers.reset()
             c._logical_operators.reset()
             self._circuit += f"R{init_basis} " + " ".join(str(i) for i in c.qubits) + "\n"
 
-    def add_variables(self, newvar, value=None) -> object:
+    def add_variables(self, newvar: Variable, value=None):
         """
         Defines a new variable for the experiment.
 
@@ -123,13 +123,15 @@ class StimExperiment:
         ----------
         newvar: Variable
             Variable to add to the context.
-        value: object, optional
-            Typically a default numerical value taken by the variable.
 
         """
-        return self._variables.setdefault(newvar, value)
+        self._variables.setdefault(newvar._name, newvar)
 
-    def measure_refined_phenom(self, *codes, meas_noise=0.0, project=None, detector_decoration=None):
+    def measure_refined_phenom(self,
+                               *codes: StabilizerCode,
+                               meas_noise: Union[Variable, str, float] = 0.0,
+                               project: Optional[str] = None,
+                               detector_decoration: Optional[Union[Literal[0], Literal[1]]] = None):
         """
         Adds a round of stabilizer measurement for the specified codes.
 
@@ -148,21 +150,22 @@ class StimExperiment:
 
         """
         if not codes:
-            codes = self._codes
+            codes = self._codes  # type: ignore
 
         for code in codes:
             for s in code._stabilizers:
                 s.measure(self._measure_clock)
                 self._circuit += f"MPP({meas_noise}) " + "*".join(f"{s[i].kind + str(s[i].qubit)}" for i in s.support) + "\n"
                 if project is None:
-                    self._circuit += "DETECTOR" + (f"({detector_decoration}) " if detector_decoration else " ") + f"rec[-1] rec[{s.last_measure_time[-2] - s.last_measure_time[-1] - 1}]\n"
+                    self._circuit += "DETECTOR" + (f"({detector_decoration}) " if detector_decoration else " ") + f"rec[-1] rec[{s.last_measure_time[-2] - s.last_measure_time[-1] - 1}]\n" # type: ignore
                 elif project == "Z" and s.isZ or project == "X" and s.isX:
                     self._circuit += "DETECTOR" + (f"({detector_decoration}) " if detector_decoration else " ") + "rec[-1]\n"
 
-    def buddy_measurement(self, code0: StabilizerCode, code1: StabilizerCode,
+    def buddy_measurement(self, code0: SurfaceCode, code1: SurfaceCode,
                           mapping: dict[int, int], mode: dict[int, dict[str, str]],
-                          meas_noise: Union[Variable, float] = "{meas_noise}",
-                          decoding_step0: int = 1, decoding_step1: int = 1):
+                          meas_noise: Union[Variable, str, float] = "{meas_noise}",
+                          decoding_step0: Union[Literal[0], Literal[1]] = 1,
+                          decoding_step1: Union[Literal[0], Literal[1]] = 1):
         """
         Intricate function ensuring that the detectors are properly set after a round of entangling transversal gates.
         Each stabilizer from one code will be associated to a "buddy" stabilizer from the other code with which it has
@@ -189,9 +192,9 @@ class StimExperiment:
         meas_noise: Union[Variable, float]
             Measurement error rate, defaults to 0.0.
         decoding_step0: int
-            Decoration for the detectors associated with code0.
+            Decoration for the detectors associated with code0, either 1 or 2.
         decoding_step1: int
-            Decoration for the detectors associated with code1.
+            Decoration for the detectors associated with code1, either 1 or 2.
         """
         # Buddies computation
 
@@ -232,10 +235,10 @@ class StimExperiment:
                 buddies = buddies0[basis].get(stab)
 
                 if not buddies:
-                    self._circuit += f"DETECTOR({decoding_step0}) rec[-1] rec[{stab.last_measure_time[-2] - stab.last_measure_time[-1] - 1}]\n"
+                    self._circuit += f"DETECTOR({decoding_step0}) rec[-1] rec[{stab.last_measure_time[-2] - stab.last_measure_time[-1] - 1}]\n" # type: ignore
                 else:
                     for buddy in buddies:
-                        self._circuit += f"DETECTOR({decoding_step0}) rec[-1] rec[{stab.last_measure_time[-2] - stab.last_measure_time[-1] - 1}] rec[{buddy.last_measure_time[-1] - stab.last_measure_time[-1] - 1}]\n"
+                        self._circuit += f"DETECTOR({decoding_step0}) rec[-1] rec[{stab.last_measure_time[-2] - stab.last_measure_time[-1] - 1}] rec[{buddy.last_measure_time[-1] - stab.last_measure_time[-1] - 1}]\n" # type: ignore
 
         # Measurement of code1
         for basis in mode[1]:
@@ -245,13 +248,13 @@ class StimExperiment:
                 buddies = buddies1[basis].get(stab)
 
                 if not buddies:
-                    self._circuit += f"DETECTOR({decoding_step1}) rec[-1] rec[{stab.last_measure_time[-2] - stab.last_measure_time[-1] - 1}]\n"
+                    self._circuit += f"DETECTOR({decoding_step1}) rec[-1] rec[{stab.last_measure_time[-2] - stab.last_measure_time[-1] - 1}]\n" # type: ignore
                 else:
                     for buddy in buddies:
-                        self._circuit += f"DETECTOR({decoding_step1}) rec[-1] rec[{stab.last_measure_time[-2] - stab.last_measure_time[-1] - 1}] rec[{(v if (v := buddy.last_measure_time[-1]) < deb else buddy.last_measure_time[-2]) - stab.last_measure_time[-1] - 1}]\n"
+                        self._circuit += f"DETECTOR({decoding_step1}) rec[-1] rec[{stab.last_measure_time[-2] - stab.last_measure_time[-1] - 1}] rec[{(v if (v := buddy.last_measure_time[-1]) < deb else buddy.last_measure_time[-2]) - stab.last_measure_time[-1] - 1}]\n" # type: ignore
 
     def observable_measurement(self, index: int, operator: PauliOperator,
-                               obs_meas_noise: Union[Variable, float] = 0.0):
+                               obs_meas_noise: Union[Variable, str, float] = 0.0):
         """
         Measures given :class:`PauliOperator` and adds it to an observable.
 
@@ -287,7 +290,8 @@ class StimExperiment:
         for i in to_measure:
             self._physical_measurement[i] = (basis, next(self._measure_clock))
 
-    def reconstruct_stabilizers(self, *codes: StabilizerCode, detector_decoration: Optional[int] = None):
+    def reconstruct_stabilizers(self, *codes: StabilizerCode,
+                                detector_decoration: Optional[Union[Literal[0], Literal[1]]] = None):
         """
         Reconstructs stabilizer measurements from the last physical measurement of the qubits.
 
@@ -298,6 +302,7 @@ class StimExperiment:
             the last physical measurement will be reconstructed, others will be silently ignored.
         detector_decoration: int, optional
             Optional decoration for the added detectors. Can be useful for the decoder.
+            Either 1 or 2 for :class:`TwoStepPymatching`.
 
         Notes
         -----
@@ -307,7 +312,7 @@ class StimExperiment:
         """
         current = self._measure_clock.current
         if not codes:
-            codes = self._codes
+            codes = self._codes # type: ignore
 
         for c in codes:
             for s in c.stabilizers:
@@ -316,7 +321,7 @@ class StimExperiment:
                     if basis is None or basis != s[qb].kind:
                         break
                 else:
-                    self._circuit += "DETECTOR" + (f"({detector_decoration}) " if detector_decoration else " ") + " ".join(f"rec[{self._physical_measurement[qb][1] - current - 1}]" for qb in s.support) + f" rec[{s.last_measure_time[-1] - current - 1}]\n"
+                    self._circuit += "DETECTOR" + (f"({detector_decoration}) " if detector_decoration else " ") + " ".join(f"rec[{self._physical_measurement[qb][1] - current - 1}]" for qb in s.support) + f" rec[{s.last_measure_time[-1] - current - 1}]\n" # type: ignore
 
     def reconstruct_observable(self, index: int, operator: PauliOperator):
         """
@@ -374,7 +379,8 @@ class StimExperiment:
         for i, j in zip(to_measure1, to_measure2):
             self._Bell_physical_measurement[Pauli(basis, i)] = (Pauli(basis2, j), next(self._measure_clock))
 
-    def reconstruct_stabilizers_Bell(self, code1: StabilizerCode, code2: StabilizerCode, detector_decoration: Optional[int] = None):
+    def reconstruct_stabilizers_Bell(self, code1: StabilizerCode, code2: StabilizerCode,
+                                     detector_decoration: Optional[Union[Literal[0], Literal[1]]] = None):
         """
         Reconstructs stabilizer Bell measurements from the last physical Bell measurement of the qubits.
 
@@ -430,7 +436,7 @@ class StimExperiment:
                 raise RuntimeError(f"No Bell measurement happened with {pauli} as primary target")
         self._circuit += f"OBSERVABLE_INCLUDE({index}) " + " ".join(f"rec[{self._Bell_physical_measurement[pauli][1] - current - 1}]" for pauli in supp1) + "\n"
 
-    def depolarize1(self, rate: Union[Variable, float], support: Optional[list[int]] = None):
+    def depolarize1(self, rate: Union[Variable, float], support: Optional[Iterable[int]] = None):
         """
         Transversal depolarizing noise over the individual physical qubits.
 
@@ -448,7 +454,7 @@ class StimExperiment:
 
         self._circuit += f"DEPOLARIZE1({rate}) " + " ".join(str(i) for i in support) + "\n"
 
-    def depolarize2(self, rate: Union[Variable, float], supports: list[tuple[int, int]]):
+    def depolarize2(self, rate: Union[Variable, float], supports: Iterable[tuple[int, int]]):
         """
         Correlated depolarizing noise over pairs of physical qubits.
 
@@ -462,7 +468,7 @@ class StimExperiment:
         """
         self._circuit += f"DEPOLARIZE2({rate}) " + " ".join(f"{qb[0]} {qb[1]}" for qb in supports) + "\n"
 
-    def get_task(self, decoder: Optional[sinter.Decoder] = None, pass_circuit: bool = False, **values) -> (list[sinter.Task], dict[str, sinter.Decoder]):
+    def get_task(self, decoder: Optional[sinter.Decoder] = None, pass_circuit: bool = False, **values) -> tuple[list[sinter.Task], dict[str, sinter.Decoder]]:
         """
         Create a list of tasks from the different values for the variables of this circuit.
 
@@ -486,7 +492,7 @@ class StimExperiment:
 
         """
         ordered_keys = values.keys()
-        assert set(var._name for var in self._variables.keys()) <= set(ordered_keys), f"All declared variables must be assigned, {set(self._variables.keys()) - set(ordered_keys)} not set"
+        assert set(self._variables.keys()) <= set(ordered_keys), f"All declared variables must be assigned, {set(self._variables.keys()) - set(ordered_keys)} not set"
 
         tasks = []
         decoder_names = {}
@@ -494,14 +500,14 @@ class StimExperiment:
             metadata = dict(zip(ordered_keys, vals))
             circuit = stim.Circuit(self._circuit.format(**metadata))
             if decoder is not None and pass_circuit:
-                instantiated_decoder = decoder(circuit)
+                instantiated_decoder = decoder(circuit) # type: ignore
             else:
                 instantiated_decoder = decoder
-            decoder_name = None if decoder is None else decoder.__name__ + "_" + str(uuid.uuid4())
+            decoder_name = None if decoder is None else decoder.__name__ + "_" + str(uuid.uuid4()) # type: ignore
             decoder_names[decoder_name] = instantiated_decoder
             task = sinter.Task(decoder=decoder_name, circuit=circuit,
                                json_metadata=metadata)
-            task.instantiated_decoder = instantiated_decoder
+            task.instantiated_decoder = instantiated_decoder # type: ignore
             tasks.append(task)
 
         return tasks, decoder_names
@@ -519,9 +525,10 @@ class StimExperiment:
 
         """
         if gate in {"CX", "CZ", "CY", "SWAP", "CNOT"}:
-            self._circuit += f"{gate} " + " ".join(" ".join(str(qb) for qb in pairs) for pairs in support) + "\n"
+            self._circuit += f"{gate} " + " ".join(" ".join(str(qb) for qb in pairs) for pairs in support) + "\n" # type: ignore
         else:
             self._circuit += f"{gate} " + " ".join(str(qb) for qb in support) + "\n"
+
 
 
 if __name__ == "__main__":

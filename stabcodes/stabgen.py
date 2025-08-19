@@ -264,7 +264,7 @@ class StabGen(RecursiveMapping):
 
         return mat
 
-    def gram_product(self, other: "StabGen") -> NDArray[np.int64]:
+    def gram_product(self, other: "StabGen") -> np.ndarray:
         """Builds the gram-like matrix of the symplectic bilinear for to summarize the commutativity relation between all the stored elements of both :class:`StabGen`.
 
         Parameters

@@ -804,8 +804,8 @@ def test_dehn_twist1():
     c.dehn_twist([0, 6, 12, 18], 24)
     c.check()
 
-    assert initial_logical["X"][0] * initial_logical["X"][1] == c.logical_operators["X"][0]
-    assert initial_logical["Z"][0] * initial_logical["Z"][1] == c.logical_operators["Z"][1]
+    assert initial_logical["X"][0] * initial_logical["X"][1] == c.logical_operators["X"][0] # type: ignore
+    assert initial_logical["Z"][0] * initial_logical["Z"][1] == c.logical_operators["Z"][1] # type: ignore
 
     c = SurfaceCode.toric_code(6, 4)
     c.dehn_twist([24, 25, 26, 27, 28, 29], 0)
@@ -821,8 +821,8 @@ def test_dehn_twist1():
     c.dehn_twist([24, 25, 26, 27, 28, 29], 0)
     c.check()
 
-    assert initial_logical["X"][0] * initial_logical["X"][1] == c.logical_operators["X"][1]
-    assert initial_logical["Z"][0] * initial_logical["Z"][1] == c.logical_operators["Z"][0]
+    assert initial_logical["X"][0] * initial_logical["X"][1] == c.logical_operators["X"][1] # type: ignore
+    assert initial_logical["Z"][0] * initial_logical["Z"][1] == c.logical_operators["Z"][0] # type: ignore
 
 
 def test_dehn_twist2():
@@ -838,16 +838,16 @@ def test_dehn_twist2():
     c.check()
     c.dehn_twist(list(range(16, 20)), 0)
     c.check()
-    assert initial_logical["X"][0] * initial_logical["X"][1] == c.logical_operators["X"][1]
-    assert initial_logical["Z"][0] * initial_logical["Z"][1] == c.logical_operators["Z"][0]
+    assert initial_logical["X"][0] * initial_logical["X"][1] == c.logical_operators["X"][1] # type: ignore
+    assert initial_logical["Z"][0] * initial_logical["Z"][1] == c.logical_operators["Z"][0] # type: ignore
 
     c = SurfaceCode.hex_code(4, 2)
     c.dehn_twist([7, 15], 0)
     c.check()
     c.dehn_twist([7, 15], 0)
 
-    assert initial_logical["X"][0] * initial_logical["X"][1] == c.logical_operators["X"][0]
-    assert initial_logical["Z"][0] * initial_logical["Z"][1] == c.logical_operators["Z"][1]
+    assert initial_logical["X"][0] * initial_logical["X"][1] == c.logical_operators["X"][0] # type: ignore
+    assert initial_logical["Z"][0] * initial_logical["Z"][1] == c.logical_operators["Z"][1] # type: ignore
     c.check()
 
 
@@ -873,8 +873,8 @@ def test_dehn_twist3():
     c.dehn_twist([3, 28, 29, 11, 17, 23, 47, 46], 35)
     c.check()
 
-    assert initial_logical["Z"][1] * PauliOperator([Z(3), Z(28), Z(29), Z(11), Z(17), Z(23), Z(47), Z(46)], 48) == c.logical_operators["Z"][1]
-    assert initial_logical["X"][0] * PauliOperator([X(27), X(9), X(10), X(35), X(41), X(22), X(21), X(45)], 48) == c.logical_operators["X"][0]
+    assert initial_logical["Z"][1] * PauliOperator([Z(3), Z(28), Z(29), Z(11), Z(17), Z(23), Z(47), Z(46)], 48) == c.logical_operators["Z"][1] # type: ignore
+    assert initial_logical["X"][0] * PauliOperator([X(27), X(9), X(10), X(35), X(41), X(22), X(21), X(45)], 48) == c.logical_operators["X"][0] # type: ignore
 
 
 if __name__ == "__main__":

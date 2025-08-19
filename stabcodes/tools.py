@@ -201,8 +201,8 @@ def couples(iterable):
         return
 
 
-def symplectic_primitive(n):
-    lambd = np.zeros((2 * n, 2 * n))
+def symplectic_primitive(n) -> np.ndarray:
+    lambd = np.zeros((2 * n, 2 * n), dtype=np.int64)
     lambd[:n, n:] = np.eye(n)
     lambd[n:, :n] = np.eye(n)
 
