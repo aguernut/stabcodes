@@ -3,6 +3,7 @@ Implements Pauli matrix and Pauli operator logic.
 """
 
 from typing import Optional, Iterator, Union, Self
+from stabcodes.measure_clock import MeasureClock
 import numpy as np
 from numpy.typing import NDArray
 from itertools import chain
@@ -1172,7 +1173,7 @@ class PauliOperator:
 
         return flag
 
-    def measure(self, measure_count: Iterator[int]) -> Optional[int]:
+    def measure(self, measure_count: Union[Iterator[int], "MeasureClock"]) -> Optional[int]:
         """Measures the Pauli operator at the next time step.
 
         The next value of the iterator over increasing measurement
