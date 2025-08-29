@@ -3,25 +3,84 @@ import matplotlib.pyplot as plt
 import datetime
 import uuid
 import math
+from typing import Iterable, Optional, Union
 
 from stabcodes.stats_split import split_stats_for_observables
 
 
-def unique_name(date=True):
+def unique_name(date: bool = True):
+    """
+    Returns a unique name with a uuid component and optionally today's date.
+    
+    Parameters
+    ----------
+    date: bool
+        Whether the date should be included at the beginning of the unique name.
+        
+    Returns
+    -------
+    str:
+        A statistically unique name.
+
+    """
     return ((str(datetime.date.today()) + "_") if date else "") + str(uuid.uuid4())
 
 
-def dump_to_csv(code_stats, namefile, clean_after=None):
+def dump_to_csv(code_stats: Iterable[sinter.TaskStats],
+                namefile: str,
+                clean_after: Optional[str] = None):
+    """
+    Write a collection of :class:`sinter.TaskStats` to a csv file.
+    
+    Parameters
+    ----------
+    code_stats: Iterable[sinter.TaskStats]
+        Collections of statistics to save to file.
+    namefile: str
+        Name of the file to write on.
+    clean_after: str, optional
+        Cutoff string from which to mangle decoder name. 
+        Helps ensuring stats decoded with different instantiated decoder to be group together properly.
+
+    """
     with open(namefile + ".csv", "w") as f:
         f.write(sinter._data._csv_out.CSV_HEADER + "\n") # type: ignore
         for stats in code_stats:
-            if clean_after is not None:
+            if clean_after is not None and clean_after in stats.decoder:
                 object.__setattr__(stats, "decoder", stats.decoder[:stats.decoder.index(clean_after)])
             f.write(stats.to_csv_line() + "\n")
 
 
-def plot_error_rate(namefile, title="Title", xlabel="Xlabel", ylabel="Ylabel",
-                    xlim=(0.9e-6, 5.1e-1), ylim=(1e-4, 1e-0), split=False, filt=None):
+def plot_error_rate(namefile: str,
+                    title: str = "Title",
+                    xlabel: str = "Xlabel",
+                    ylabel: str = "Ylabel",
+                    xlim: Optional[tuple[float, float]] = None,
+                    ylim: Optional[tuple[float, float]] = None,
+                    split: bool = False,
+                    filt: Optional[Iterable[int]] = None):
+    """
+    Plots the statistics gathered in the file `namefile`.
+    
+    Parameters
+    ----------
+    namefile: str
+        Name of the file containing the collected statistics.
+    title: str
+        Title of the figure.
+    xlabel: str
+        Label of the X axis.
+    ylabel: str
+        Label of the Y axis.
+    xlim: tuple[float, float], optional
+        Range of the X axis to display on all the subfigures. If left to None, Matplotlib will decide for each individual figures.
+    ylim: tuple[float, float], optional
+        Range of the Y axis to display on all the subfigures. If left to None, Matplotlib will decide for each individual figures.
+    split: bool
+        Whether to attempt to split the observables into several subfigures. Data must have been collected with the `count_observable_error_combos=True` option.
+    filt: Iterable[int], optional
+        Choose a subset of observables to display. Requires `split=True`.
+    """
 
     stats = sinter.stats_from_csv_files(namefile + ".csv")
 
@@ -58,8 +117,11 @@ def plot_error_rate(namefile, title="Title", xlabel="Xlabel", ylabel="Ylabel",
                 group_func=lambda stats: f"d={str(stats.json_metadata['d'])} ({stats.decoder})",
             )
 
-            ax.set_ylim(*ylim)
-            ax.set_xlim(*xlim)
+            if xlim is not None:
+                ax.set_xlim(*xlim)
+            if ylim is not None:
+                ax.set_ylim(*ylim)
+
             ax.tick_params(axis='both', which='major', labelsize=20)
             ax.tick_params(axis='both', which='minor', labelsize=20)
             ax.loglog()
