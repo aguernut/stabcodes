@@ -2,7 +2,6 @@ from stabcodes.stim_experiment import StimExperiment, Variable
 from stabcodes.stabilizer_code import SurfaceCode
 from stabcodes.visualization import dump_to_csv, plot_error_rate, unique_name
 from stabcodes._decoding_two_step_pymatching import TwoStepPymatching
-from stabcodes.tools import mapping
 from itertools import chain
 import sinter
 
@@ -26,7 +25,7 @@ def SurfaceTransversalCNOT(distance):
 
     exp.apply_gate("CX", list(zip(code1.qubits, code2.qubits)))
     exp.depolarize2(noise, list(zip(code1.qubits, code2.qubits)))
-    mapp = mapping(code1, code2, {0: "X", 1: "X"}, {code1.qubits[0]: code2.qubits[0]})
+    mapp = SurfaceCode.mapping(code1, code2, {0: "X", 1: "X"}, {code1.qubits[0]: code2.qubits[0]})
     exp.buddy_measurement(code1, code2, mapp, {0: {"X": "X", "Z": ""}, 1: {"X": "", "Z": "Z"}}, noise, 1, 2)
 
     for _ in range(distance // 2):
@@ -84,9 +83,9 @@ def SurfaceTransversalCNOTBell(distance):
     exp.apply_gate("CX", list(zip(code1.qubits, code2.qubits)))
     exp.apply_gate("CX", list(zip(perfect_code1.qubits, perfect_code2.qubits)))
     exp.depolarize2(noise, list(zip(code1.qubits, code2.qubits)))
-    mapp = mapping(code1, code2, {0: "X", 1: "X"}, {code1.qubits[0]: code2.qubits[0]})
+    mapp = SurfaceCode.mapping(code1, code2, {0: "X", 1: "X"}, {code1.qubits[0]: code2.qubits[0]})
     exp.buddy_measurement(code1, code2, mapp, {0: {"X": "X", "Z": ""}, 1: {"X": "", "Z": "Z"}}, noise, 1, 2)
-    mapp = mapping(perfect_code1, perfect_code2, {0: "X", 1: "X"}, {perfect_code1.qubits[0]: perfect_code2.qubits[0]})
+    mapp = SurfaceCode.mapping(perfect_code1, perfect_code2, {0: "X", 1: "X"}, {perfect_code1.qubits[0]: perfect_code2.qubits[0]})
     exp.buddy_measurement(perfect_code1, perfect_code2, mapp, {0: {"X": "X", "Z": ""}, 1: {"X": "", "Z": "Z"}}, 0.0, 1, 2)
 
     for _ in range(distance // 2):

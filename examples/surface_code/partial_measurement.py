@@ -2,7 +2,7 @@ from stabcodes.stim_experiment import StimExperiment, Variable
 from stabcodes.stabilizer_code import SurfaceCode
 from stabcodes.visualization import dump_to_csv, plot_error_rate, unique_name
 from stabcodes._decoding_two_step_pymatching import TwoStepPymatching
-from stabcodes.tools import mapping, reverse_dict
+from stabcodes.tools import reverse_dict
 from itertools import chain
 import sinter
 
@@ -26,7 +26,7 @@ def SurfacePartialMeasurementRough(distance):
         exp.measure_refined_phenom(*codes, meas_noise=noise)
         exp.depolarize1(noise)
 
-    mapp = mapping(patch, code, {0: "Z", 1: "Z"}, {patch.qubits[1]: (code.qubits[0] + distance**2 + distance) if horizontal else code.qubits[1]})
+    mapp = SurfaceCode.mapping(patch, code, {0: "Z", 1: "Z"}, {patch.qubits[1]: (code.qubits[0] + distance**2 + distance) if horizontal else code.qubits[1]})
     completed_mapp = dict(zip(code.qubits, code.qubits))
     completed_mapp.update(reverse_dict(mapp))
 

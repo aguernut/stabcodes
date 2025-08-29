@@ -2,7 +2,6 @@ from stabcodes.stim_experiment import StimExperiment, Variable
 from stabcodes.stabilizer_code import SurfaceCode
 from stabcodes.visualization import dump_to_csv, plot_error_rate, unique_name
 from stabcodes._decoding_two_step_pymatching import TwoStepPymatching
-from stabcodes.tools import mapping
 from itertools import chain
 import sinter
 
@@ -26,7 +25,7 @@ def SurfaceTransversalCZ(distance):
         exp.measure_refined_phenom(*codes, meas_noise=noise)
         exp.depolarize1(noise)
 
-    mapp = mapping(code1, code2, {0: "X", 1: "Z"}, {code1.qubits[0]: code2.qubits[0]})
+    mapp = SurfaceCode.mapping(code1, code2, {0: "X", 1: "Z"}, {code1.qubits[0]: code2.qubits[0]})
     exp.apply_gate("CZ", mapp.items())
     exp.depolarize2(noise, mapp.items())
     exp.buddy_measurement(code1, code2, mapp, {0: {"X": "Z", "Z": ""}, 1: {"X": "Z", "Z": ""}}, noise, 1, 2)
@@ -83,8 +82,8 @@ def SurfaceTransversalCZBell(distance):
         exp.depolarize1(noise, code1.qubits)
         exp.depolarize1(noise, code2.qubits)
 
-    mapp = mapping(code1, code2, {0: "X", 1: "Z"}, {code1.qubits[0]: code2.qubits[0]})
-    mapp2 = mapping(perfect_code1, perfect_code2, {0: "X", 1: "Z"}, {perfect_code1.qubits[0]: perfect_code2.qubits[0]})
+    mapp = SurfaceCode.mapping(code1, code2, {0: "X", 1: "Z"}, {code1.qubits[0]: code2.qubits[0]})
+    mapp2 = SurfaceCode.mapping(perfect_code1, perfect_code2, {0: "X", 1: "Z"}, {perfect_code1.qubits[0]: perfect_code2.qubits[0]})
     exp.apply_gate("CZ", mapp.items())
     exp.apply_gate("CZ", mapp2.items())
     exp.depolarize2(noise, mapp.items())
