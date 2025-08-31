@@ -30,15 +30,6 @@ def SurfaceTransversalS(distance):
     exp.apply_gate("CZ", CZ_support)
     exp.depolarize2(noise, CZ_support)
 
-    # qis = qiskit.QuantumCircuit(len(code.qubits))
-    # for i in s_support:
-    #     qis.s(i)
-    # for qbs in CZ_support:
-    #     qis.cz(*qbs)
-    # 
-    # code.stabilizers.apply_circuit_to_stabs(qis, True)
-    # code.logical_operators.apply_circuit_to_stabs(qis)
-
     dic = dict(CZ_support)
     dic.update(reverse_dict(dic))
     dic.update([(i, i) for i in s_support])
@@ -69,16 +60,11 @@ def SurfaceTransversalSBell(distance):
     exp = StimExperiment()
     noise = Variable("noise")
     exp.add_variables(noise)
-    exp.startup(code, perfect_code, init_bases="ZZ")
-
-    exp.destructive_measurement_Bell(code.qubits, perfect_code.qubits, "Z")
-    exp.destructive_measurement_Bell(code.qubits, perfect_code.qubits, "X")
+    exp.startup_Bell([code], [perfect_code], init_bases="Z")
 
     for i, (obs1, obs2) in enumerate(zip(code.logical_operators, perfect_code.logical_operators)):
         exp.reconstruct_observable_Bell(obs1, obs2, i)
 
-    exp.measure_refined_phenom(code, meas_noise=noise, project="")
-    exp.measure_refined_phenom(perfect_code, meas_noise=0.0, project="")
 
     for _ in range(distance // 2):
         exp.measure_refined_phenom(code, meas_noise=noise)
@@ -141,36 +127,27 @@ if __name__ == "__main__":
     tasks = []
     custom_decoders = {}
 
-    for distance in range(3, 6, 2):
+    for distance in range(3, 8, 2):
         exp = SurfaceTransversalSBell(distance)
         t, decoders = exp.get_task(decoder=TwoStepPymatching, pass_circuit=True, d=[distance],
-                                   noise=[0.01 * ((0.02 / 0.01)**(i / 10)) for i in range(11)])
+                                   noise=[0.03 * ((0.04 / 0.03)**(i / 10)) for i in range(11)])
         tasks.extend(t)
-        with open("foo.circ", "w") as f:
-            f.write(str(tasks[0].circuit))
         custom_decoders.update(decoders)
     
     code_stats = sinter.collect(
-        num_workers=11,
+        num_workers=16,
         tasks=tasks,
         decoders=[],
         custom_decoders=custom_decoders,
-        max_shots=1_000_000,
-#        print_progress=True
+        max_shots=100_000,
+        print_progress=True,
+        count_observable_error_combos=True
     )
-    #     t, _ = exp.get_task(d=[distance],
-    #                         noise=[0.01 * ((0.02 / 0.01)**(i / 10)) for i in range(11)])
-    #     tasks.extend(t)
-    # code_stats = sinter.collect(
-    #     num_workers=11,
-    #     tasks=tasks,
-    #     decoders=["pymatching"],
-    #     max_shots=10_000_000,
-    #     # print_progress=True,
-    #     # separated = True
-    # )
 
-    namefile = "result_transS_" + unique_name()
+
+    namefile = "build/result_transS_" + unique_name()
     dump_to_csv(code_stats, namefile, clean_after="_")
 
-    plot_error_rate(namefile)
+    plot_error_rate(namefile, split=True)
+    import matplotlib.pyplot as plt
+    plt.show()
