@@ -48,10 +48,7 @@ def SurfaceIDTBell(distance):
     exp = StimExperiment()
     noise = Variable("noise")
     exp.add_variables(noise)
-    exp.startup(code, perfect_code, init_bases="ZZ")
-
-    exp.destructive_measurement_Bell(code.qubits, perfect_code.qubits, "Z")
-    exp.destructive_measurement_Bell(code.qubits, perfect_code.qubits, "X")
+    exp.startup_Bell([code], [perfect_code], init_bases="Z")
 
     exp.reconstruct_observable_Bell(code.logical_operators["Z"][0],
                                     perfect_code.logical_operators["Z"][0], 0)
@@ -61,9 +58,6 @@ def SurfaceIDTBell(distance):
                                     perfect_code.logical_operators["X"][0], 2)
     exp.reconstruct_observable_Bell(code.logical_operators["X"][1],
                                     perfect_code.logical_operators["X"][1], 3)
-
-    exp.measure_refined_phenom(code, meas_noise=noise, project="")
-    exp.measure_refined_phenom(perfect_code, meas_noise=0.0, project="")
 
     for _ in range(distance // 2):
         exp.measure_refined_phenom(code, meas_noise=noise)
@@ -115,18 +109,20 @@ if __name__ == "__main__":
     for distance in range(3, 8, 2):
         exp = SurfaceIDTBell(distance)
         t, _ = exp.get_task(d=[distance],
-                            noise=[0.025 * ((0.035 / 0.025)**(i / 20)) for i in range(21)])
+                            noise=[0.03 * ((0.04 / 0.03)**(i / 20)) for i in range(21)])
         tasks.extend(t)
     code_stats = sinter.collect(
-        num_workers=7,
+        num_workers=16,
         tasks=tasks,
         decoders=["pymatching"],
         max_shots=100_000,
-        print_progress=True
-        # separated = True
+        print_progress=True,
+        count_observable_error_combos=True,
     )
 
-    namefile = "result_IDT_" + unique_name()
+    namefile = "build/result_IDT_" + unique_name()
     dump_to_csv(code_stats, namefile)
 
-    plot_error_rate(namefile)
+    plot_error_rate(namefile, split=True)
+    import matplotlib.pyplot as plt
+    plt.show()
