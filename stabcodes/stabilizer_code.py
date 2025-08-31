@@ -613,7 +613,7 @@ class SurfaceCode(StabilizerCode):
                 to_move[-1].append(qb)
         return CNOTs, to_move
     
-    def mapping(cls, code0: Self, code1: Self,
+    def mapping(code0: Self, code1: Self,
                 modes: dict[Union[Literal[0], Literal[1]], str],
                 qb: dict[int, int], rev: bool = False):
         seen = set()
