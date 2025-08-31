@@ -114,6 +114,54 @@ class StimExperiment:
             c._stabilizers.reset()
             c._logical_operators.reset()
             self._circuit += f"R{init_basis} " + " ".join(str(i) for i in c.qubits) + "\n"
+            
+    def startup_Bell(self, codes: list[StabilizerCode], perfect_codes: list[StabilizerCode], init_bases: str = "Z"):
+        """
+        Initialization of the Bell experiment.
+
+        Notes
+        -----
+        Any tracked qubit must be part of a code. Each code must have a corresponding perfect code.
+
+        Parameters
+        ----------
+        codes: StabilizerCode
+            Any number of stabilizer codes that takes part in the experiment.
+            
+        perfect_codes: StabilizerCode
+            Copies of each codes that takes part in the experiment.
+
+        init_bases: str
+            Basis in which the qubits of each code will initialized.
+            One basis per code must be specified, inside a common string (e.g. "ZZX").
+            Perfect codes will automatically be initialized in the same basis.
+
+        """
+        if len(codes) != len(perfect_codes):
+            raise ValueError("Each erroneous code must be paired with a perfect code.")
+        if len(init_bases) != len(codes):
+            raise ValueError("An initialization basis for each pair of codes must be specified.")
+
+        self._measure_clock = MeasureClock()
+        self._physical_measurement = {}
+        self._Bell_physical_measurement = {}
+        self._codes = list(codes) + list(perfect_codes)
+        N = sum(c.num_qubits for c in self._codes)
+        self._data_qubits = range(N)
+        qb_shift = 0
+        for c, init_basis in zip(self._codes, init_bases*2):
+            c.shift_qubits(qb_shift, N)
+            qb_shift += len(c.qubits)
+            c._stabilizers.reset()
+            c._logical_operators.reset()
+            self._circuit += f"R{init_basis} " + " ".join(str(i) for i in c.qubits) + "\n"
+        
+        for c, pc in zip(codes, perfect_codes):
+            self.destructive_measurement_Bell(c.qubits, pc.qubits, "Z")
+            self.destructive_measurement_Bell(c.qubits, pc.qubits, "X")
+        
+        for c in self._codes:
+            self.measure_refined_phenom(c, meas_noise=0.0, project="")
 
     def add_variables(self, newvar: Variable, value=None):
         """
