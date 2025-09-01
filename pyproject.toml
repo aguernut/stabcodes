@@ -20,3 +20,6 @@ doc = [
 "sphinx",
 "pydata_sphinx_theme",
 ]
+tests = [
+"pytest",
+]

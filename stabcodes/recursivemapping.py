@@ -619,9 +619,6 @@ class RecursiveMapping(MutableMapping, MutableSequence):
             else:
                 raise IndexError(f"{type(self).__name__} index out of range ({index} >= {len(self)}).")
 
-    # def index(self):
-    #     pass
-
     def index(self, value, start: int = 0, stop: Optional[int] = None) -> int:
         '''Returns the first index of value in the base level.
 

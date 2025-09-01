@@ -1954,6 +1954,7 @@ class Stabilizer2D(Stabilizer):
         >>> P = Stabilizer2D([Y(3), Y(4), Z(0), X(1)], 5)
         >>> available = [Stabilizer2D([Z(0), Z(1)], 5), Stabilizer2D([Z(1), Z(2)], 5), Stabilizer2D([Z(2), Z(3)], 5), Stabilizer2D([Z(3), Z(4)], 5)]
         >>> P.isimplify(available)
+        Stabilizer2D([X(3), X(4), Y(1)], 5)
         >>> P.order.remove(0)
         >>> P
         Stabilizer2D([X(3), X(4), Y(1)], 5)
