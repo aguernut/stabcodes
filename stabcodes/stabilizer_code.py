@@ -248,7 +248,7 @@ class SurfaceCode(StabilizerCode):
     """
 
     @classmethod
-    def hex_code(cls, d1: int, d2: int) -> "SurfaceCode":
+    def hex_code(cls, d1: int, d2: int) -> Self:
         """
         Builds a toric surface code with hexagonal geometry.
 
@@ -309,7 +309,7 @@ class SurfaceCode(StabilizerCode):
                                            (list(range(len(stabx), len(stabx) + len(stabz) - 1)), [len(stabx) + len(stabz) - 1])])
 
     @classmethod
-    def toric_code(cls, d1: int, d2: int) -> "SurfaceCode":
+    def toric_code(cls, d1: int, d2: int) -> Self:
         """
         Builds a toric surface code over a square lattice.
 
@@ -361,7 +361,7 @@ class SurfaceCode(StabilizerCode):
                                    (list(range(len(stabx), len(stabx) + len(stabz) - 1)), [len(stabx) + len(stabz) - 1])])
 
     @classmethod
-    def cylindrical_patch(cls, dx: int, dz: int, big_dx=None) -> "SurfaceCode":
+    def cylindrical_patch(cls, dx: int, dz: int, big_dx: Optional[int] = None) -> Self:
         """
         Builds a cylindrical patch of surface code (a toric code with two parallel boundaries).
         Use a square lattice.
@@ -423,7 +423,7 @@ class SurfaceCode(StabilizerCode):
 
         return SurfaceCode(code._stabilizers, code._logical_operators, code._qubits, code._stab_relations)
 
-    def iter_stabilizers(self, kind=None):
+    def iter_stabilizers(self, kind: Optional[str] = None):
         """
         Iterates over the stabilizers of this code. Can be filtered to only include stabilizers of a specific Pauli kind.
 
@@ -438,7 +438,11 @@ class SurfaceCode(StabilizerCode):
         else:
             return iter(self._stabilizers[kind])
 
-    def dehn_twist(self, guide, auxiliary=None, to_avoid={}, force_cnot=[], check=True) -> tuple[list[int], list[tuple[int]], Optional[int]]:
+    def dehn_twist(self, guide: list[int],
+                   auxiliary: Optional[int] = None,
+                   to_avoid: Optional[set[int]] = {},
+                   force_cnot: Optional[list[tuple[int, int]]] = [],
+                   check: bool = True) -> tuple[list[int], list[tuple[int]], Optional[int]]:
         """
         Performs one step of a dehn twist procedure, modifying the object accordingly.
 
@@ -450,7 +454,7 @@ class SurfaceCode(StabilizerCode):
             One qubit within the Xoperator parallel to the guide, indicating the side on which the twist is performed. Typically, left as None for the first step and then fed the auxiliary value output at the end of this first step.
         to_avoid: set[int], optional
             Legacy parameter, qubit indices that will be not be considered as support for the cnots. Do not use if you do are unsure.
-        force_cnot: list[tuple[int]], optional
+        force_cnot: list[tuple[int, int]], optional
             List of precomputed CNOT gates to use for the dehn twist step. Use this to force a specific set of CNOT gate to be used.
         check: bool, optional
             Whether a sanity check of the consistency of the surface code is run at the end.
@@ -510,7 +514,7 @@ class SurfaceCode(StabilizerCode):
 
         return ordered_guide, CNOTs, auxiliary
 
-    def _compute_ordered_pairs(self, guide, auxiliary, to_avoid={}):
+    def _compute_ordered_pairs(self, guide: list[int], auxiliary: int, to_avoid: Optional[set[int]] = {}) -> tuple[set[int], list[int], list[tuple[int, int]], int]:
         """
         Select the X stabilizers traversed by a the guide, starting
         with one containing auxiliary.
@@ -593,7 +597,7 @@ class SurfaceCode(StabilizerCode):
 
         return guide_as_set, ordered_guide, ordered_pairs, auxiliary
 
-    def _compute_CNOTs(self, guide_as_set, ordered_pairs):
+    def _compute_CNOTs(self, guide_as_set: set[int], ordered_pairs: list[tuple[int], int]):
         """
         Compute the CNOTs required for the dehn twist
         """
@@ -613,9 +617,27 @@ class SurfaceCode(StabilizerCode):
                 to_move[-1].append(qb)
         return CNOTs, to_move
     
-    def mapping(code0: Self, code1: Self,
+    def mapping(code0: Self,
+                code1: Self,
                 modes: dict[Union[Literal[0], Literal[1]], str],
-                qb: dict[int, int], rev: bool = False):
+                qb: dict[int, int]) -> dict[int, int]:
+        """
+        In-place modify a mapping between the qubit indices from code0 and the qubit indices from code1.
+        
+        Parameters
+        ----------
+        code0: SurfaceCode
+            First code to consider
+        code1: SurfaceCode
+            Second code to consider
+        modes: dict[Union[Literal[0], Literal[1]], str]
+            Which kind of stabilizers to use for alignment from each code.
+            {0: "X", 1: "Z"} will seek an alignment of X-stabilizers from code0
+            to Z-stabilizers from code1.
+        qb: dict[int, int]
+            Mapping of qubit to be completed.
+
+        """
         seen = set()
         seen2 = set()
         traited = set()
